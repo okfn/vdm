@@ -15,3 +15,4 @@ class TestGetAttributeNames:
         out = get_attribute_names(X) 
         exp = [ 'id', 'name', 'license' ]
         assert set(out) == set(exp)
+

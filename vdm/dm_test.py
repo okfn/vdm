@@ -1,5 +1,6 @@
 import dm
 
+# TODO: multiple changes to same object in the same transaction
 
 class TestRepository1:
 
@@ -156,4 +157,25 @@ class TestDomainObjectWithForeignKey:
         out = pkg.license.name 
         exp = self.license2.name
         assert out == exp
+
+
+class TestManyToMany:
+
+    def setup_class(self):
+        self.repo = dm.Repository() 
+        self.repo.rebuild()
+
+        txn = self.repo.begin_transaction()
+        self.tagname = 'testtagm2m'
+        self.pkgname = 'testpkgm2m'
+        pkg = txn.model.packages.create(name=self.pkgname)
+        tag = txn.model.tags.create(name=self.tagname)
+        pkg2tag = txn.model.package_tags.create(package=pkg, tag=tag)
+        self.pkg2tag_id = pkg2tag.id
+        txn.commit()
+
+    def test_1(self):
+        rev = self.repo.youngest_revision()
+        pkg = rev.model.packages.get(self.pkgname)
+        # not really working so nothing to test
 

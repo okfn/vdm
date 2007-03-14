@@ -136,11 +136,10 @@ class VersionedDomainObjectRegister(Register):
         """
         sqlobj = self.type.sqlobj_class(**kwargs)
         obj = self.type(sqlobj, self.revision, self.transaction)
-        # clunky way to ensure associated version is created
-        # TODO: think more about this
-        if self.key_name != 'id': # id is problematic as used by sqlobject ...
-            setattr(obj, self.key_name, kwargs[self.key_name])
-        # TODO: ? set other values from kwargs
+        obj._ensure_working_copy()
+        print kwargs
+        for key, value in kwargs.items():
+            setattr(obj, key, value)
         return obj
     
     def get(self, key):
@@ -204,5 +203,4 @@ class ObjectRevisionSQLObject(sqlobject.SQLObject):
         newvals['revision'] = transaction.revision
         newrev = self.__class__(**newvals)
         return newrev
-
 

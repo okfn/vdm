@@ -28,10 +28,43 @@ class PackageRevision(base.ObjectRevisionSQLObject):
     license = sqlobject.ForeignKey('License', default=None)
 
 
+class TagSQLObject(sqlobject.SQLObject):
+
+    name = sqlobject.UnicodeCol(alternateID=True)
+
+
+class TagRevision(base.ObjectRevisionSQLObject):
+
+    base_object_name = 'Tag'
+    # TODO: probably should not have this on the revision as immutable
+    name = sqlobject.UnicodeCol(default=None)
+
+
+class PackageTagSQLObject(sqlobject.SQLObject):
+
+    package = sqlobject.ForeignKey('PackageSQLObject', cascade=True)
+    tag = sqlobject.ForeignKey('TagSQLObject', cascade=True)
+
+class PackageTagRevision(base.ObjectRevisionSQLObject):
+
+    base_object_name = 'PackageTag'
+
 class Package(base.VersionedDomainObject):
 
     sqlobj_class = PackageSQLObject
     sqlobj_version_class = PackageRevision
+    
+
+class Tag(base.VersionedDomainObject):
+
+    sqlobj_class = TagSQLObject
+    sqlobj_version_class = TagRevision
+
+
+class PackageTag(base.VersionedDomainObject):
+
+    sqlobj_class = PackageTagSQLObject
+    sqlobj_version_class = PackageTagRevision
 
 
 class DomainModel(object):
@@ -39,6 +72,8 @@ class DomainModel(object):
     def __init__(self, revision, transaction=None):
         self.revision = revision
         self.packages = base.VersionedDomainObjectRegister(Package, 'name', revision, transaction)
+        self.tags = base.VersionedDomainObjectRegister(Tag, 'name', revision, transaction)
+        self.package_tags = base.VersionedDomainObjectRegister(PackageTag, 'id', revision, transaction)
 
 # -----------------------------------------------------------------
 # Versioned Material Follows
@@ -100,6 +135,10 @@ class Repository(object):
             License,
             PackageSQLObject,
             PackageRevision,
+            TagSQLObject,
+            TagRevision,
+            PackageTagSQLObject,
+            PackageTagRevision,
             ]
 
     def create_tables(self):
