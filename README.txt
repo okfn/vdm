@@ -11,6 +11,10 @@ Licensed under the MIT license:
 
   <http://www.opensource.org/licenses/mit-license.php>
 
+## Requirements
+
+  * domainmodel-0.1: http://www.kforgeproject.com/files/domainmodel-1.0/
+
 ## Documentation
 
 A great starting point is Fowler's *Patters for things that change with time*:
