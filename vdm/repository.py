@@ -1,178 +1,77 @@
-"""
-A versioned domain model demonstration.
-"""
-import sqlobject
-uri = 'sqlite:/:memory:'
-__connection__ = sqlobject.connectionForURI(uri)
+import dm.application
+import dm.dom.builder
+from vdm.app import *
 
-import base
-from base import State
+class RepositoryModelBuilder(SimpleModelBuilder):
 
+    def construct(self):
+        self.load_state()
+        self.load_vdm()
 
-class License(sqlobject.SQLObject):
+    def load_state(self):
+        from dm.dom.state import State
+        self.registry.registerDomainClass(State)
+        self.registry.states = State.createRegister()
 
-    name = sqlobject.StringCol(alternateID=True)
+    def load_vdm(self):
+        import vdm.revision
+        self.registry.registerDomainClass(vdm.revision.Revision)
+        self.registry.revisions = vdm.revision.Revision.createRegister()
 
+class RepositoryBuilder(SimpleBuilder):
 
-class PackageSQLObject(sqlobject.SQLObject):
+    def findModelBuilder(self):
+        return RepositoryModelBuilder()
 
-    name = sqlobject.UnicodeCol(alternateID=True)
+class Repository(dm.application.Application):
+    builderClass = RepositoryBuilder
 
+    def __init__(self):
+        super(Repository, self).__init__()
+        # TODO: check this has not been done already
+        self.initialise()
+        self.revisions = self.registry.revisions
+        if self._is_new_repository():
+            self.init()
 
-class PackageRevision(base.ObjectRevisionSQLObject):
+    def initialise(self):
+        self.registry.states.create('active')
+        self.registry.states.create('deleted')
+        self.registry.states.create('pending')
 
-    base_object_name = 'Package'
-    # TODO: probably should not have this on the revision as immutable
-    name = sqlobject.UnicodeCol(default=None)
-    notes = sqlobject.UnicodeCol(default=None)
-    license = sqlobject.ForeignKey('License', default=None)
-
-
-class TagSQLObject(sqlobject.SQLObject):
-
-    name = sqlobject.UnicodeCol(alternateID=True)
-
-
-class TagRevision(base.ObjectRevisionSQLObject):
-
-    base_object_name = 'Tag'
-    # TODO: probably should not have this on the revision as immutable
-    name = sqlobject.UnicodeCol(default=None)
-
-
-class PackageTagSQLObject(sqlobject.SQLObject):
-
-    package = sqlobject.ForeignKey('PackageSQLObject', cascade=True)
-    tag = sqlobject.ForeignKey('TagSQLObject', cascade=True)
-
-class PackageTagRevision(base.ObjectRevisionSQLObject):
-
-    base_object_name = 'PackageTag'
-
-class Package(base.VersionedDomainObject):
-
-    sqlobj_class = PackageSQLObject
-    sqlobj_version_class = PackageRevision
-    
-
-class Tag(base.VersionedDomainObject):
-
-    sqlobj_class = TagSQLObject
-    sqlobj_version_class = TagRevision
-
-
-class PackageTag(base.VersionedDomainObject):
-
-    sqlobj_class = PackageTagSQLObject
-    sqlobj_version_class = PackageTagRevision
-
-
-class DomainModel(object):
-
-    def __init__(self, revision, transaction=None):
-        self.revision = revision
-        self.packages = base.VersionedDomainObjectRegister(Package, 'name', revision, transaction)
-        self.tags = base.VersionedDomainObjectRegister(Tag, 'name', revision, transaction)
-        self.package_tags = base.VersionedDomainObjectRegister(PackageTag, 'id', revision, transaction)
-
-# -----------------------------------------------------------------
-# Versioned Material Follows
-
-class Revision(sqlobject.SQLObject):
-    """A Revision to the domain model.
-
-    A revision in the is valid only if {number} is not null (there may be some
-    non-valid revisions in the database which correspond to failed or pending transactions).
-    """
-
-    # would like number to have alternateID=True but then cannot have
-    # default=None
-    number = sqlobject.IntCol(default=None, unique=True)
-    author = sqlobject.UnicodeCol(default=None)
-    log = sqlobject.UnicodeCol(default=None)
-    # TODO: date time col (need to set in transaction)
-    # date = sqlobject.DateTimeCol(default=None)
-
-    # sqlobject takees over __init__ ...
-    def _init(self, *args, **kw):
-        sqlobject.SQLObject._init(self, *args, **kw)
-        if 'transaction' in kw.keys():
-            self.model = DomainModel(self, transaction)
-        else:
-            self.model = DomainModel(self)
-
-
-class Transaction(object):
-    """A transaction encapsulates an atomic change to the domain model.
-
-    Should it just inherit from revision?
-    ANS: no a Transaction generates a revision (if successful) but is not a
-    revision
-    """
-
-    def __init__(self, base_revision):
-        # TODO: start db transaction ....
-        self.base_revision = base_revision
-        self.model = DomainModel(self.base_revision, transaction=self)
-        # the new revision that will be 'created' if this Transaction succeeds
-        self.revision = Revision()
-        self.author = None
-        self.log = u''
-
-    def commit(self):
-        # TODO: generate the revision number in some better way
-        self.revision.number = self.revision.id
-        self.revision.log = self.log
-        self.revision.author = self.author
-
-
-class Repository(object):
-
-    # should be in order needed for creation
-    classes = [
-            State,
-            Revision,
-            License,
-            PackageSQLObject,
-            PackageRevision,
-            TagSQLObject,
-            TagRevision,
-            PackageTagSQLObject,
-            PackageTagRevision,
-            ]
-
-    def create_tables(self):
-        for cls in self.classes:
-            cls.createTable(ifNotExists=True)
-
-    def drop_tables(self):
-        # cannot just use reversed as this operates in place
-        size = len(self.classes)
-        indices = range(size)
-        indices.reverse()
-        reversed = [ self.classes[xx] for xx in indices ]
-        for cls in reversed:
-            cls.dropTable(ifExists=True)
-    
-    def rebuild(self):
-        "Rebuild the domain model."
-        self.drop_tables()
-        self.create_tables()
-        self.init()
+    def _is_new_repository(self):
+        # Need to be more careful -- could have a non-valid revision in there
+        # from a failed transaction but would be very unusual as it would mean
+        # init() had failed
+        no_revisions = len(self.registry.revisions) == 0
+        return no_revisions
 
     def init(self):
-        "Initialise the domain model with default data."
-        State(name='active')
-        State(name='deleted')
+        # do not use a transaction but insert directly to avoid the bootstrap
+        # problem
+        base_rev = self.registry.revisions.create(
+                number=1,
+                log_message='Initialising the Repository',
+                author='system',
+                state = self.registry.states['active'],
+                )
 
     def youngest_revision(self):
-        revisions = Revision.select(orderBy=Revision.q.number).reversed()
-        for rev in revisions:
-            return rev
-        # no revisions
-        return None
+        # sort by hand for the time being
+        # investigate search in future ...
+        holding = {}
+        for rev in self.registry.revisions:
+            if rev.number is not None:
+                holding[rev.number] = rev
+        numbers = holding.keys()
+        if len(numbers) == 0:
+            return None # no revisions
+        numbers.sort()
+        last_rev_number = numbers[-1]
+        return holding[last_rev_number]
     
     def get_revision(self, id):
+        raise Exception('Not Implemented')
         revs = list(Revision.select(Revision.q.number == id))
         if len(revs) == 0:
             raise Exception('Error: no revisions with id: %s' % id)
@@ -181,10 +80,12 @@ class Repository(object):
         else:
             return revs[0]
     
-    def begin_transaction(self, revision_number=None):
-        if revision_number == None:
-            revision_number = self.youngest_revision()
-        txn = Transaction(revision_number)
+    def begin_transaction(self, revision=None):
+        if revision == None:
+            revision = self.youngest_revision()
+        txn = self.registry.revisions.create()
+        txn.base_revision = revision
+        txn.save()
         return txn
 
     def history(self):
@@ -192,7 +93,9 @@ class Repository(object):
 
         @return: a list of ordered revisions with youngest first.
         """
+        raise Exception('Not Implemented')
         revisions = list(
                 Revision.select(orderBy=Revision.q.number).reversed()
                 )
         return revisions
+

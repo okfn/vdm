@@ -1,19 +1,25 @@
 import dm.application
 import dm.builder
+import dm.dom.builder
 from dm.ioc import *
 
 class SysDict(dict):
 
     def __init__(self):
+        # set some defaults
         self['logging.level'] = 'DEBUG'
         self['logging.log_file'] = './log.txt'
         self['system_name'] = 'blah'
         self['db.uri'] = 'sqlite:/:memory:'
         self['db.type'] = 'sqlite'
 
+class SimplePluginController:
 
-import dm.dom.builder
-class MyModelBuilder(dm.dom.builder.ModelBuilder):
+    def notify(self, *args, **kwargs):
+        # do nothing
+        pass
+
+class SimpleModelBuilder(dm.dom.builder.ModelBuilder):
 
     registry = RequiredFeature('DomainRegistry')
     dictionary = RequiredFeature('SystemDictionary')
@@ -21,35 +27,24 @@ class MyModelBuilder(dm.dom.builder.ModelBuilder):
     def construct(self):
         pass
 
-class MyPluginController:
-
-    def notify(self, *args, **kwargs):
-        # do nothing
-        pass
-
-
-class MyBuilder(dm.builder.ApplicationBuilder):
+class SimpleBuilder(dm.builder.ApplicationBuilder):
 
     def findSystemDictionary(self):
         return SysDict()
 
     def findFileSystem(self):
+        # stub it as we do not need it
         return None
 
     def findModelBuilder(self):
-        return MyModelBuilder()
+        return SimpleModelBuilder()
 
     def findPluginController(self):
-        return MyPluginController()
+        return SimplePluginController()
 
+import dm.application
+class SimpleApplication(dm.application.Application):
 
-class Application(dm.application.Application):
-    "Provides single entry point for clients."
+    builderClass = SimpleBuilder
 
-    builderClass = MyBuilder
-
-    def initialise(self):
-        pass
-
-# ensure only exists ...
-application = Application()
+# application = SimpleApplication()
