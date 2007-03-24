@@ -44,7 +44,7 @@ class Package(vdm.base.VersionedDomainObject):
     name = sqlobject.UnicodeCol(alternateID=True)
 
     # should be attribute_name, module_name, module_object
-    m2m = [ ('tags', 'vdm.dm', 'Tag', 'PackageTag') ]
+    m2m = [ ('tags', 'vdm.demo', 'Tag', 'PackageTag') ]
 
 
 class Tag(vdm.base.VersionedDomainObject):
