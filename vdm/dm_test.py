@@ -1,4 +1,11 @@
-import dm
+import sqlobject
+uri = 'sqlite:/:memory:'
+connection = sqlobject.connectionForURI(uri)
+sqlobject.sqlhub.processConnection = connection
+
+import vdm.dm
+import vdm.base
+
 
 # TODO: multiple changes to same object in the same transaction
 
@@ -7,22 +14,20 @@ class TestRepository1:
     def setup_class(self):
         # we tear down here rather than in a teardown method so we can
         # investigate if things go wrong
-        self.repo = dm.Repository() 
+        self.repo = vdm.base.Repository(vdm.dm.DomainModel) 
         self.repo.rebuild()
 
         txn = self.repo.begin_transaction()
         self.author = 'jones'
         self.pkgname = 'jones'
         pkg = txn.model.packages.create(name=self.pkgname)
-        txn.author = self.author
-        txn.log = ''
         txn.commit()
 
         txn2 = self.repo.begin_transaction()
         self.pkgname2 = 'testpkg2'
-        self.log = 'Revision 2'
+        self.log_message = 'Revision 2'
         txn2.author = self.author
-        txn2.log = self.log
+        txn2.log_message = self.log_message
         self.newnotes = 'This is a note on a package.'
         pkg = txn2.model.packages.get(self.pkgname)
         pkg.notes = self.newnotes
@@ -32,32 +37,32 @@ class TestRepository1:
     def test_youngest_revision(self):
         rev = self.repo.youngest_revision()
         revnum = rev.number
-        assert revnum == 2
+        assert revnum == 3
 
     def test_commit_attributes(self):
         rev = self.repo.youngest_revision()
         assert rev.author == self.author
-        assert rev.log == self.log
+        assert rev.log_message == self.log_message
 
-    def test_package_revisions(self):
+    def test_package_history(self):
         rev = self.repo.youngest_revision()
         pkg = rev.model.packages.get(self.pkgname)
-        assert len(pkg.revisions) == 2
-        assert pkg.revisions[-1].revision.number == 2
+        assert len(pkg.history) == 2
+        assert pkg.history[-1].revision.number == 3
 
-    def test_package_revisions_2(self):
-        rev = self.repo.get_revision(1)
+    def test_package_history_2(self):
+        rev = self.repo.get_revision(2)
         pkg = rev.model.packages.get(self.pkgname)
-        assert len(pkg.revisions) == 1
-        assert pkg.revisions[-1].revision.number == 1
+        assert len(pkg.history) == 1
+        assert pkg.history[-1].revision.number == 2
 
     def test_exists_1(self):
-        rev = self.repo.get_revision(1)
+        rev = self.repo.get_revision(2)
         pkg = rev.model.packages.get(self.pkgname)
         assert pkg.exists()
 
     def test_exists_2(self):
-        rev = self.repo.get_revision(1)
+        rev = self.repo.get_revision(2)
         try:
             pkg = rev.model.packages.get(self.pkgname2)
             assert False, 'Should have raised an exception'
@@ -68,14 +73,14 @@ class TestRepository1:
         rev = self.repo.youngest_revision()
         pkg = rev.model.packages.get(self.pkgname)
         revnum = pkg.revision.number 
-        assert revnum == 2
+        assert revnum == 3
         assert pkg.name == self.pkgname
         assert pkg.notes == self.newnotes
 
     def test_commit_material_2(self):
-        rev = self.repo.get_revision(1)
+        rev = self.repo.get_revision(2)
         pkg = rev.model.packages.get(self.pkgname)
-        assert pkg.revision.number == 1
+        assert pkg.revision.number == 2
         assert pkg.notes == None
 
     def test_list(self):
@@ -84,18 +89,26 @@ class TestRepository1:
         assert len(allpkgs) == 2
 
     def test_history(self):
-        count = 2 # number of revisions
-        history = self.repo.history()
+        count = 3 # number of revisions
+        history = list(self.repo.history())
         assert len(history) > 0
         for item in history:
             assert count == item.number
             count -= 1
 
+    def test_purge(self):
+        rev = self.repo.youngest_revision()
+        pkg = rev.model.packages.purge(self.pkgname)
+        pkgs = rev.model.packages.list()
+        assert len(pkgs) == 1
+        names = [ pkg.name for pkg in pkgs ]
+        assert self.pkgname not in names
+
 
 class TestRepository2:
 
     def setup_class(self):
-        self.repo = dm.Repository() 
+        self.repo = vdm.base.Repository(vdm.dm.DomainModel) 
         self.repo.rebuild()
 
         txn = self.repo.begin_transaction()
@@ -128,11 +141,11 @@ class TestDomainObjectWithForeignKey:
     def setup_class(self):
         # we tear down here rather than in a teardown method so we can
         # investigate if things go wrong
-        self.repo = dm.Repository() 
+        self.repo = vdm.base.Repository(vdm.dm.DomainModel) 
         self.repo.rebuild()
 
-        self.license1 = dm.License(name='test_license1')
-        self.license2 = dm.License(name='test_license2')
+        self.license1 = vdm.dm.License(name='test_license1')
+        self.license2 = vdm.dm.License(name='test_license2')
         txn = self.repo.begin_transaction()
         self.pkgname = 'testpkgfk'
         pkg = txn.model.packages.create(name=self.pkgname)
@@ -145,14 +158,14 @@ class TestDomainObjectWithForeignKey:
         txn2.commit()
  
     def test_set1(self):
-        rev = self.repo.get_revision(1)
+        rev = self.repo.get_revision(2)
         pkg = rev.model.packages.get(self.pkgname)
         out = pkg.license.name 
         exp = self.license1.name
         assert out == exp
 
     def test_set2(self):
-        rev = self.repo.get_revision(2)
+        rev = self.repo.get_revision(3)
         pkg = rev.model.packages.get(self.pkgname)
         out = pkg.license.name 
         exp = self.license2.name
@@ -162,20 +175,43 @@ class TestDomainObjectWithForeignKey:
 class TestManyToMany:
 
     def setup_class(self):
-        self.repo = dm.Repository() 
+        self.repo = vdm.base.Repository(vdm.dm.DomainModel) 
         self.repo.rebuild()
 
         txn = self.repo.begin_transaction()
         self.tagname = 'testtagm2m'
+        self.tagname2 = 'testtagm2m2'
         self.pkgname = 'testpkgm2m'
         pkg = txn.model.packages.create(name=self.pkgname)
-        tag = txn.model.tags.create(name=self.tagname)
-        pkg2tag = txn.model.package_tags.create(package=pkg, tag=tag)
+        self.tag = txn.model.tags.create(name=self.tagname)
+        self.tag2 = txn.model.tags.create(name=self.tagname2)
+        pkg2tag = txn.model.package_tags.create(package=pkg, tag=self.tag)
         self.pkg2tag_id = pkg2tag.id
+        pkg.tags.create(tag=self.tag2)
         txn.commit()
 
     def test_1(self):
         rev = self.repo.youngest_revision()
         pkg = rev.model.packages.get(self.pkgname)
-        # not really working so nothing to test
+        pkg2tag = rev.model.package_tags.get(self.pkg2tag_id)
+        assert pkg2tag.package.name == self.pkgname
+
+    def test_2(self):
+        rev = self.repo.youngest_revision()
+        pkg = rev.model.packages.get(self.pkgname)
+        pkg2tag = pkg.tags.get(self.tag2)
+        assert pkg2tag.package.name == self.pkgname
+        pkg2tag2 = pkg.tags.get(self.tag)
+        assert pkg2tag2.package.name == self.pkgname
+        assert pkg2tag2.tag.name == self.tagname
+
+    def test_list(self):
+        rev = self.repo.youngest_revision()
+        pkg = rev.model.packages.get(self.pkgname)
+
+        all = rev.model.package_tags.list() 
+        assert len(all) == 2
+        pkgtags = pkg.tags.list()
+        assert len(pkgtags) == 2
+
 

@@ -5,8 +5,8 @@ import sqlobject
 uri = 'sqlite:/:memory:'
 __connection__ = sqlobject.connectionForURI(uri)
 
-import base
-from base import State
+import vdm.base
+from vdm.base import State
 
 
 class License(sqlobject.SQLObject):
@@ -14,185 +14,78 @@ class License(sqlobject.SQLObject):
     name = sqlobject.StringCol(alternateID=True)
 
 
-class PackageSQLObject(sqlobject.SQLObject):
+class PackageRevision(vdm.base.ObjectRevisionSQLObject):
 
-    name = sqlobject.UnicodeCol(alternateID=True)
-
-
-class PackageRevision(base.ObjectRevisionSQLObject):
-
-    base_object_name = 'Package'
+    base = sqlobject.ForeignKey('Package')
     # TODO: probably should not have this on the revision as immutable
     name = sqlobject.UnicodeCol(default=None)
     notes = sqlobject.UnicodeCol(default=None)
     license = sqlobject.ForeignKey('License', default=None)
 
 
-class TagSQLObject(sqlobject.SQLObject):
+class TagRevision(vdm.base.ObjectRevisionSQLObject):
 
-    name = sqlobject.UnicodeCol(alternateID=True)
-
-
-class TagRevision(base.ObjectRevisionSQLObject):
-
-    base_object_name = 'Tag'
+    base = sqlobject.ForeignKey('Tag')
     # TODO: probably should not have this on the revision as immutable
     name = sqlobject.UnicodeCol(default=None)
 
 
-class PackageTagSQLObject(sqlobject.SQLObject):
 
-    package = sqlobject.ForeignKey('PackageSQLObject', cascade=True)
-    tag = sqlobject.ForeignKey('TagSQLObject', cascade=True)
+class PackageTagRevision(vdm.base.ObjectRevisionSQLObject):
 
-class PackageTagRevision(base.ObjectRevisionSQLObject):
+    base = sqlobject.ForeignKey('PackageTag')
 
-    base_object_name = 'PackageTag'
 
-class Package(base.VersionedDomainObject):
+class Package(vdm.base.VersionedDomainObject):
 
-    sqlobj_class = PackageSQLObject
     sqlobj_version_class = PackageRevision
+    versioned_attributes = vdm.base.get_attribute_names(sqlobj_version_class)
     
+    name = sqlobject.UnicodeCol(alternateID=True)
 
-class Tag(base.VersionedDomainObject):
+    # should be attribute_name, module_name, module_object
+    m2m = [ ('tags', 'vdm.dm', 'Tag', 'PackageTag') ]
 
-    sqlobj_class = TagSQLObject
+
+class Tag(vdm.base.VersionedDomainObject):
+
     sqlobj_version_class = TagRevision
 
+    name = sqlobject.UnicodeCol(alternateID=True)
+    versioned_attributes = vdm.base.get_attribute_names(sqlobj_version_class)
 
-class PackageTag(base.VersionedDomainObject):
+    m2m = []
 
-    sqlobj_class = PackageTagSQLObject
+
+class PackageTag(vdm.base.VersionedDomainObject):
+
     sqlobj_version_class = PackageTagRevision
+    versioned_attributes = vdm.base.get_attribute_names(sqlobj_version_class)
+    m2m = []
+
+    package = sqlobject.ForeignKey('Package', cascade=True)
+    tag = sqlobject.ForeignKey('Tag', cascade=True)
+
+    package_tag_index = sqlobject.DatabaseIndex('package', 'tag',
+            unique=True)
 
 
-class DomainModel(object):
+class DomainModel(vdm.base.DomainModelBase):
 
-    def __init__(self, revision, transaction=None):
-        self.revision = revision
-        self.packages = base.VersionedDomainObjectRegister(Package, 'name', revision, transaction)
-        self.tags = base.VersionedDomainObjectRegister(Tag, 'name', revision, transaction)
-        self.package_tags = base.VersionedDomainObjectRegister(PackageTag, 'id', revision, transaction)
-
-# -----------------------------------------------------------------
-# Versioned Material Follows
-
-class Revision(sqlobject.SQLObject):
-    """A Revision to the domain model.
-
-    A revision in the is valid only if {number} is not null (there may be some
-    non-valid revisions in the database which correspond to failed or pending transactions).
-    """
-
-    # would like number to have alternateID=True but then cannot have
-    # default=None
-    number = sqlobject.IntCol(default=None, unique=True)
-    author = sqlobject.UnicodeCol(default=None)
-    log = sqlobject.UnicodeCol(default=None)
-    # TODO: date time col (need to set in transaction)
-    # date = sqlobject.DateTimeCol(default=None)
-
-    # sqlobject takees over __init__ ...
-    def _init(self, *args, **kw):
-        sqlobject.SQLObject._init(self, *args, **kw)
-        if 'transaction' in kw.keys():
-            self.model = DomainModel(self, transaction)
-        else:
-            self.model = DomainModel(self)
-
-
-class Transaction(object):
-    """A transaction encapsulates an atomic change to the domain model.
-
-    Should it just inherit from revision?
-    ANS: no a Transaction generates a revision (if successful) but is not a
-    revision
-    """
-
-    def __init__(self, base_revision):
-        # TODO: start db transaction ....
-        self.base_revision = base_revision
-        self.model = DomainModel(self.base_revision, transaction=self)
-        # the new revision that will be 'created' if this Transaction succeeds
-        self.revision = Revision()
-        self.author = None
-        self.log = u''
-
-    def commit(self):
-        # TODO: generate the revision number in some better way
-        self.revision.number = self.revision.id
-        self.revision.log = self.log
-        self.revision.author = self.author
-
-
-class Repository(object):
-
-    # should be in order needed for creation
     classes = [
-            State,
-            Revision,
             License,
-            PackageSQLObject,
+            Package,
             PackageRevision,
-            TagSQLObject,
+            Tag,
             TagRevision,
-            PackageTagSQLObject,
+            PackageTag,
             PackageTagRevision,
             ]
 
-    def create_tables(self):
-        for cls in self.classes:
-            cls.createTable(ifNotExists=True)
+    def __init__(self, revision, transaction=None):
+        super(DomainModel, self).__init__(revision, transaction)
+        self.packages = vdm.base.VersionedDomainObjectRegister(Package, 'name', revision, transaction)
+        self.tags = vdm.base.VersionedDomainObjectRegister(Tag, 'name', revision, transaction)
+        self.package_tags = vdm.base.VersionedDomainObjectRegister(PackageTag, 'id', revision, transaction)
 
-    def drop_tables(self):
-        # cannot just use reversed as this operates in place
-        size = len(self.classes)
-        indices = range(size)
-        indices.reverse()
-        reversed = [ self.classes[xx] for xx in indices ]
-        for cls in reversed:
-            cls.dropTable(ifExists=True)
-    
-    def rebuild(self):
-        "Rebuild the domain model."
-        self.drop_tables()
-        self.create_tables()
-        self.init()
 
-    def init(self):
-        "Initialise the domain model with default data."
-        State(name='active')
-        State(name='deleted')
-
-    def youngest_revision(self):
-        revisions = Revision.select(orderBy=Revision.q.number).reversed()
-        for rev in revisions:
-            return rev
-        # no revisions
-        return None
-    
-    def get_revision(self, id):
-        revs = list(Revision.select(Revision.q.number == id))
-        if len(revs) == 0:
-            raise Exception('Error: no revisions with id: %s' % id)
-        elif len(revs) > 1:
-            raise Exception('Error: more than one revision with id: %s' % id)
-        else:
-            return revs[0]
-    
-    def begin_transaction(self, revision_number=None):
-        if revision_number == None:
-            revision_number = self.youngest_revision()
-        txn = Transaction(revision_number)
-        return txn
-
-    def history(self):
-        """Get the history of the repository.
-
-        @return: a list of ordered revisions with youngest first.
-        """
-        revisions = list(
-                Revision.select(orderBy=Revision.q.number).reversed()
-                )
-        return revisions
