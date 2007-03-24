@@ -1,10 +1,11 @@
 """
-All the versioned domain model stuff.
+Developer Comments
+==================
 
 Crude dependency injection via the repository object.
 
 WARNING: currently due to the nature of SQLObject it is not possible to have
-multiple revisions 'live' at the same time.
+multiple revisions of the *same* object 'live' at the same time.
 
 rev1 = repo.get_revision(10)
 rev2 = repo.get_revision(11)
