@@ -13,10 +13,15 @@ setup(
     author = "Rufus Pollock (Open Knowledge Foundation)",
     author_email = "rufus@rufuspollock.org",
     description = \
-"Support for versioned domain model objects defined using SQLObject.",
+"A versioned domain model framework.",
     long_description = \
 """
-Support for versioned domain model objects defined using SQLObject.
+The vdm package allows you to 'version' your domain model objects in the same
+way that source code version control systems such as subversion help you
+version your code. At present the package is built as a simple extension on top
+of SQLObject so that those already familiar with SQLObject for creating domain
+ models will find it easy to use the versioning facilities provided by this
+ library.
 """,
     license = "MIT",
     keywords = "versioning subversion python sqlobject",
