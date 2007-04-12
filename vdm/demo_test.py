@@ -208,10 +208,20 @@ class TestManyToMany:
     def test_list(self):
         rev = self.repo.youngest_revision()
         pkg = rev.model.packages.get(self.pkgname)
-
         all = rev.model.package_tags.list() 
         assert len(all) == 2
         pkgtags = pkg.tags.list()
         assert len(pkgtags) == 2
 
+    def test_another_txn(self):
+        txn = self.repo.begin_transaction()
+        pkg = txn.model.packages.get(self.pkgname)
+        pkg.notes = 'blah'
+        pkg2tag = pkg.tags.get(self.tag)
+        pkg2tag.delete()
+        txn.commit()
+        rev = self.repo.youngest_revision()
+        outpkg = rev.model.packages.get(self.pkgname)
+        pkgtags = outpkg.tags.list()
+        assert len(pkgtags) == 1
 
