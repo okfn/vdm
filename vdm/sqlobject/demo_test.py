@@ -3,8 +3,8 @@ uri = 'sqlite:/:memory:'
 connection = sqlobject.connectionForURI(uri)
 sqlobject.sqlhub.processConnection = connection
 
-import vdm.base
-import vdm.demo
+import vdm.sqlobject.base
+import vdm.sqlobject.demo
 
 
 # TODO: multiple changes to same object in the same transaction
@@ -14,7 +14,7 @@ class TestRepository1:
     def setup_class(self):
         # we tear down here rather than in a teardown method so we can
         # investigate if things go wrong
-        self.repo = vdm.base.Repository(vdm.demo.DomainModel) 
+        self.repo = vdm.sqlobject.base.Repository(vdm.sqlobject.demo.DomainModel) 
         self.repo.rebuild()
 
         txn = self.repo.begin_transaction()
@@ -108,7 +108,7 @@ class TestRepository1:
 class TestRepository2:
 
     def setup_class(self):
-        self.repo = vdm.base.Repository(vdm.demo.DomainModel) 
+        self.repo = vdm.sqlobject.base.Repository(vdm.sqlobject.demo.DomainModel) 
         self.repo.rebuild()
 
         txn = self.repo.begin_transaction()
@@ -141,11 +141,11 @@ class TestDomainObjectWithForeignKey:
     def setup_class(self):
         # we tear down here rather than in a teardown method so we can
         # investigate if things go wrong
-        self.repo = vdm.base.Repository(vdm.demo.DomainModel) 
+        self.repo = vdm.sqlobject.base.Repository(vdm.sqlobject.demo.DomainModel) 
         self.repo.rebuild()
 
-        self.license1 = vdm.demo.License(name='test_license1')
-        self.license2 = vdm.demo.License(name='test_license2')
+        self.license1 = vdm.sqlobject.demo.License(name='test_license1')
+        self.license2 = vdm.sqlobject.demo.License(name='test_license2')
         txn = self.repo.begin_transaction()
         self.pkgname = 'testpkgfk'
         pkg = txn.model.packages.create(name=self.pkgname)
@@ -175,7 +175,7 @@ class TestDomainObjectWithForeignKey:
 class TestManyToMany:
 
     def setup_class(self):
-        self.repo = vdm.base.Repository(vdm.demo.DomainModel) 
+        self.repo = vdm.sqlobject.base.Repository(vdm.sqlobject.demo.DomainModel) 
         self.repo.rebuild()
 
         txn = self.repo.begin_transaction()

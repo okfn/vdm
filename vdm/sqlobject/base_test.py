@@ -4,7 +4,7 @@ uri = 'sqlite:/:memory:'
 connection = sqlobject.connectionForURI(uri)
 sqlobject.sqlhub.processConnection = connection
 
-from vdm.base import *
+from vdm.sqlobject.base import *
 
 class StubModel(DomainModelBase):
     classes = []
