@@ -152,15 +152,19 @@ class Repository(object):
         return revisions
 
 
-class ObjectRevisionEntity(elixir.Entity):
+class ObjectRevisionEntity(object):
 
     # to be defined in inheriting classes
     # base_object_name = ''
     
-    elixir.belongs_to('state', of_kind='State')
+    # elixir concrete inheritance does not work so have to use a mixin approach
+    # define these in actual class
+    # elixir.belongs_to('state', of_kind='State')
 
     def __init__(self, *args, **kwargs):
-        super(ObjectRevisionEntity, self).__init__(args, kwargs)
+        super(ObjectRevisionEntity, self).__init__()
+
+    def _default_state(self):
         self.state_id = 1
 
     def copy(self, transaction):
@@ -174,25 +178,26 @@ class ObjectRevisionEntity(elixir.Entity):
         return newrev
 
 
-def get_attribute_names(sqlobj_class):
+def get_attribute_names(object_version):
     # extra attributes added into Revision classes that should not be available
     # in main object
-    excluded = [ 'revision', 'base' ]
+    excluded = [ 'id', 'revision', 'base' ]
     results = []
-    for col in sqlobj_class.sqlmeta.columns.keys():
-        if col.endswith('ID'):
-            col = col[:-2]
+    # do not worry about many-to-many fields as we never have them on the
+    # version
+    for col in object_version._descriptor.fields:
+        if col.endswith('_id'):
+            col = col[:-3]
         if col not in excluded:
             results.append(col)
     return results
 
 
-class VersionedDomainObject(elixir.Entity):
+class VersionedDomainObject(object):
 
     version_class = None
     
-    def __init__(self, *args, **kwargs):
-        super(VersionedDomainObject, self).__init__(*args, **kwargs)
+    def _init_versioned_domain_object(self):
         self._version_operations_ok = False
 
     def set_revision(self, revision, transaction):
@@ -290,7 +295,7 @@ class VersionedDomainObject(elixir.Entity):
             if self.transaction is None:
                 raise Exception('Unable to set attributes outside of a transaction')
             rev = self.version_class(
-                    base=self.sqlobj,
+                    base=self,
                     revision=self.transaction)
             return rev
 
@@ -304,13 +309,14 @@ class VersionedDomainObject(elixir.Entity):
         deleted = State.get_by(name='deleted')
         self.state = deleted
     
-    
     def purge(self):
         select = self.version_class.select_by(base=self)
         for rev in select:
             self.version_class.delete(rev)
         # because we have overriden delete have to play smart
-        super(VersionedDomainObject, self).delete(self)
+        self.__class__.delete(self)
+        # we flush immediately here as a special case ...
+        elixir.objectstore.flush()
 
 
 ## ------------------------------------------------------

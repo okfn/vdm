@@ -137,22 +137,16 @@ class TestRepository2:
         assert rev1.number == 5
 
 
-#class TestGetAttributeNames:
-#
-#    def test_1(self):
-#        class X:
-#            class sqlmeta:
-#                columns = { 
-#                        'id' : None,
-#                        'name' : None,
-#                        'licenseID' : None,
-#                        'revisionID' : None,
-#                        'base' : None,
-#                        }
-#        out = get_attribute_names(X) 
-#        exp = [ 'id', 'name', 'license' ]
-#        assert set(out) == set(exp)
-#
+class TestGetAttributeNames:
+
+    def test_1(self):
+        class X(elixir.Entity):
+            elixir.belongs_to('state', of_kind='State')
+            elixir.has_field('number', elixir.Integer)
+        out = get_attribute_names(X) 
+        exp = [ 'state', 'number' ]
+        assert set(out) == set(exp)
+
 
 class StubEntity(elixir.Entity):
     elixir.has_field('name', Unicode)
