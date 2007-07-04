@@ -2,7 +2,7 @@ from elixir import *
 uri = 'sqlite:///:memory:'
 metadata.connect(uri)
 
-import vdm.elixir.base
+import vdm.elixir
 import vdm.elixir.demo
 
 
@@ -13,7 +13,7 @@ class TestRepository1:
     def setup_class(self):
         # we tear down here rather than in a teardown method so we can
         # investigate if things go wrong
-        self.repo = vdm.elixir.base.Repository(vdm.elixir.demo.DomainModel) 
+        self.repo = vdm.elixir.Repository(vdm.elixir.demo.DomainModel) 
         self.repo.rebuild()
 
         txn = self.repo.begin_transaction()
@@ -107,7 +107,7 @@ class TestRepository1:
 class TestRepository2:
 
     def setup_class(self):
-        self.repo = vdm.elixir.base.Repository(vdm.elixir.demo.DomainModel) 
+        self.repo = vdm.elixir.Repository(vdm.elixir.demo.DomainModel) 
         self.repo.rebuild()
 
         txn = self.repo.begin_transaction()
@@ -140,7 +140,7 @@ class TestDomainObjectWithForeignKey:
     def setup_class(self):
         # we tear down here rather than in a teardown method so we can
         # investigate if things go wrong
-        self.repo = vdm.elixir.base.Repository(vdm.elixir.demo.DomainModel) 
+        self.repo = vdm.elixir.Repository(vdm.elixir.demo.DomainModel) 
         self.repo.rebuild()
 
         self.license1 = vdm.elixir.demo.License(name='test_license1')
@@ -174,7 +174,7 @@ class TestDomainObjectWithForeignKey:
 class TestManyToMany:
 
     def setup_class(self):
-        self.repo = vdm.elixir.base.Repository(vdm.elixir.demo.DomainModel) 
+        self.repo = vdm.elixir.Repository(vdm.elixir.demo.DomainModel) 
         self.repo.rebuild()
 
         txn = self.repo.begin_transaction()

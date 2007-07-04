@@ -5,7 +5,7 @@ uri = 'sqlite:///:memory:'
 metadata.connect(uri)
 
 
-from vdm.elixir.base import *
+from vdm.elixir import *
 
 class TestStateAndRevision:
 
