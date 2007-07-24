@@ -36,5 +36,8 @@ In particular Temporal Object:
 
   http://www.martinfowler.com/ap2/temporalObject.html
 
-In addition we make heavy use of various other standard patterns (references
-are to PoEAA) such as Unit of Work.
+To see the (sqlobject) code in action take a look at:
+
+  ./vdm/sqlobject/demo_test.py
+  ./vdm/sqlobject/demo.py
+
