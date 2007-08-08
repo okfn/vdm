@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import elixir
 from elixir import *
 uri = 'sqlite:///:memory:'
 metadata.connect(uri)
@@ -7,48 +8,49 @@ metadata.connect(uri)
 from vdm.elixir import *
 
 
-class StubEntity(elixir.Entity):
-    elixir.has_field('name', Unicode)
+class DemoEntityRevision(elixir.Entity):
 
-class TestRegister:
-    
+    is_version()
+    elixir.has_field('name', elixir.Unicode()) 
+    elixir.belongs_to('base', of_kind='DemoEntity')
+
+
+class DemoEntity(elixir.Entity):
+
+    is_versioned('DemoEntityRevision')
+    has_versioned_field('name')
+    # elixir barfs if the object has no defined fields ...
+    elixir.has_field('blah', elixir.Integer)
+
+
+class TestStuff:
+
     def setup_class(self):
+        elixir.create_all()
+        self.xx = DemoEntity()
+        elixir.objectstore.flush()
+
+    def teardown_class(self):
         elixir.objectstore.clear()
         elixir.drop_all()
-        elixir.create_all()
-        self.reg = Register(StubEntity, 'name')
-        self.name1 = 'a'
-        self.name2 = 'b'
-        self.reg.create(name=self.name1)
-        self.reg.create(name=self.name2)
+
+    def test_basic_attributes(self):
+        assert hasattr(self.xx, '_ensure_version_operations_ok')
+        self.xx._ensure_version_operations_ok()
+        assert len(self.xx.history) == 0
+
+    def test_history(self):
+        self.xx._ensure_working_copy()
+        assert len(self.xx.history) == 1
+        out = self.xx._current()
+        assert out is not None
+        assert hasattr(out, 'name')
+
+    def test_set_attribute(self):
+        en1 = DemoEntity()
+        en1.name = 'jones'
         elixir.objectstore.flush()
+        elixir.objectstore.clear()
+        out1 = DemoEntity.get(en1.id)
+        assert out1.name == 'jones'
 
-    def test_get(self):
-        # tests create too -- obviously
-        obj = self.reg.get(self.name1)
-        assert obj.name == self.name1
-    
-    def test_list(self):
-        out = self.reg.list()
-        assert len(out) == 2
-
-    def test__iter__(self):
-        count = 0
-        names = [ self.name1, self.name2 ]
-        for obj in self.reg:
-            assert obj.name in names
-            count += 1
-        assert count == 2
-
-    def test_len(self):
-        assert len(self.reg) == 2
-
-    def test_delete(self):
-        self.reg.delete(self.name1)
-        elixir.objectstore.flush()
-        assert len(self.reg) == 1
-
-    def test_purge(self):
-        self.reg.purge(self.name2)
-        elixir.objectstore.flush()
-        assert len(self.reg) == 0

@@ -5,303 +5,147 @@ import elixir
 import sqlalchemy
 
 
-class ObjectRevisionEntity(object):
+class IsRevisioned(object):
+    '''
+    This does quite a lot of work as we need to add lots of methods to the
+    object. In a way would be nicer to work with inheritance but Elixir does
+    not yet support concrete table inheritance and multiple inheritance is a
+    pain.
+    '''
 
-    # to be defined in inheriting classes
-    # base_object_name = ''
-    
-    # elixir concrete inheritance does not work so have to use a mixin approach
-    # define these in actual class
-    # elixir.belongs_to('state', of_kind='State')
+    def __init__(self, entity, *args, **kwargs):
+        entity_version_name = args[0]
+        # do *not* want this module but module in which entity is being defined
+        # module_name = self.__module__
+        module_name = entity.__module__
+        module = __import__(module_name, None, None, 'blah')
+        self.entity_version = module.__dict__[entity_version_name]
+        entity.version_class = self.entity_version
+        self.setup_helper_methods(entity)
 
-    def __init__(self, *args, **kwargs):
-        super(ObjectRevisionEntity, self).__init__()
+    def setup_helper_methods(self, entity):
+        '''
+        use inst throughout so as not to conflict with self
+        '''
 
-    def _default_state(self):
-        self.state_id = 1
-
-    def copy(self, transaction):
-        newvals = {}
-        for col in self._descriptor.fields:
-            if not col.startswith('revision') and col != 'id':
-                value = getattr(self, col)
-                newvals[col] = value
-        newvals['revision'] = transaction
-        newrev = self.__class__(**newvals)
-        return newrev
-
-
-def get_attribute_names(object_version):
-    # extra attributes added into Revision classes that should not be available
-    # in main object
-    excluded = [ 'id', 'revision', 'base' ]
-    results = []
-    # do not worry about many-to-many fields as we never have them on the
-    # version
-    for col in object_version._descriptor.fields:
-        if col.endswith('_id'):
-            col = col[:-3]
-        if col not in excluded:
-            results.append(col)
-    return results
-
-
-class VersionedDomainObject(object):
-
-    version_class = None
-    
-    def _init_versioned_domain_object(self):
-        self._version_operations_ok = False
-
-    def set_revision(self, revision, transaction):
-        self.revision = revision
-        self.transaction = transaction
-        self.have_working_copy = False
-        # use history instead of revisions because revisions causes conflict
-        # with sqlobject
-        self.history = []
-        self._get_revisions()
-        self._version_operations_ok = True
-        self._setup_versioned_m2m()
-
-    def _setup_versioned_m2m(self):
-        for name, module_name, object_name, join_object_name in self.m2m:
-            # do some meta trickery to get class from the name
-            # __import__('A.B') returns A unless fromlist is *not* empty
-            mod = __import__(module_name, None, None, 'blah')
-            obj = mod.__dict__[join_object_name]
-            self.__dict__[name] = KeyedRegister(
-                    type=obj,
-                    key_name='id',
-                    revision=self.revision,
-                    transaction=self.transaction,
-                    keyed_value_name=self.__class__.__name__.lower(),
-                    keyed_value=self,
-                    other_key_name=object_name.lower()
-                    )
-
-    def _assert_version_operations_ok(self):
-        if not self._version_operations_ok:
-            msg = 'No Revision is set on this object so it is not possible' + \
-                    ' to do operations involving versioning.'
-            raise Exception(msg)
-
-    def _get_revisions(self):
-        # if not based off any revision (should only happen if this is first
-        # ever revision in entire repository)
-        if self.revision is None:
+        # TODO: Do we need this if run only once per instance?
+        # only do this once so check we have not already set stuff up
+        if hasattr(entity, '_get_revisions'):
             return
-        ourrev = self.revision.number
         
-        # TODO: more efficient way
-        select = list(
-                self.version_class.select_by(base=self)
-                )
-        revdict = {}
-        for objrev in select:
-            revdict[objrev.revision.number] = objrev
-        revnums = revdict.keys()
-        revnums.sort()
-        if len(revnums) == 0: # should only happen if package only just created
-            return
-        created_revision = revnums[0]
-        if created_revision > ourrev: # then package does not exist yet
-            return
-        # Take all package revisions with revision number <= ourrev
-        # TODO: make more efficient
-        for tt in revnums:
-            if tt <= ourrev:
-                self.history.append(revdict[tt])
+        # decorator helper
+        def attach_to_entity(fn):
+            setattr(entity, fn.__name__, fn)
 
-    def _current(self):
-        return self.history[-1]
+        @attach_to_entity
+        def _ensure_version_operations_ok(inst):
+            # only do this once ...
+            if not hasattr(inst, 'history'):
+                inst.session = sqlalchemy.object_session(inst)
+                inst.global_revision = False
+                # are we doing global revisions?
+                # if not only doing stuff per entity
+                if hasattr(inst.session, 'revision'):
+                    inst.global_revision = True
+                    inst.revision = inst.session.revision
+                inst._get_revisions()
 
-    def __getattr__(self, attrname):
-        if attrname in self.versioned_attributes:
-            self._assert_version_operations_ok()
-            return getattr(self._current(), attrname)
-        else:
-            raise AttributeError()
+        @attach_to_entity
+        def _get_revisions(inst):
+            select = inst.version_class.select_by(base=inst)
+            def filter_revisions(revision_list):
+                if not inst.global_revision:
+                    return revision_list
 
-    def __setattr__(self, attrname, attrval):
-        if attrname != 'versioned_attributes' and attrname in self.versioned_attributes:
-            self._assert_version_operations_ok()
-            self._ensure_working_copy()
-            current = self._current()
-            # print 'Setting attribute before: ', attrname, attrval, current
-            setattr(current, attrname, attrval)
-            # print 'Setting attribute after: ', attrname, attrval, current
-        else:
-            super(VersionedDomainObject, self).__setattr__(attrname, attrval)
+                ourrev = inst.revision.timestamp
+                filtered = []
+                for objrev in revision_list:
+                    if objrev.timestamp <= ourrev:
+                        filtered.append(objrev)
+                return filtered
+            inst.history = filter_revisions(select)
 
-    def _ensure_working_copy(self):
-        if not self.have_working_copy:
-            wc = self._new_working_copy()
-            self.have_working_copy = True
-            self.history.append(wc)
+        @attach_to_entity
+        def _current(inst):
+            return inst.history[-1]
 
-    def _new_working_copy(self):
-        # 2 options: either we are completely new or based off existing current
-        if len(self.history) > 0:
-            return self._current().copy(self.transaction)
-        else:
-            if self.transaction is None:
-                raise Exception('Unable to set attributes outside of a transaction')
-            rev = self.version_class(
-                    base=self,
-                    revision=self.transaction)
-            return rev
+        @attach_to_entity
+        def _ensure_working_copy(inst):
+            if not hasattr(inst, 'have_working_copy') or inst.have_working_copy:
+                wc = inst._new_working_copy()
+                inst.have_working_copy = True
+                inst.history.append(wc)
 
-    def exists(self):
-        # is this right -- what happens if we did not have anything at revision
-        # and have just created something as part of the current transaction
-        # ...
-        return len(self.history) > 0
+        @attach_to_entity
+        def _new_working_copy(inst):
+            # 2 options: either we are completely new or based off existing current
+            if len(inst.history) > 0:
+                return inst._current().copy()
+            else:
+                rev = inst.version_class()
+                rev.base = inst 
+                return rev
 
-    def delete(self):
-        deleted = State.get_by(name='deleted')
-        self.state = deleted
-    
-    def purge(self):
-        select = self.version_class.select_by(base=self)
-        for rev in select:
-            self.version_class.delete(rev)
-        # because we have overriden delete have to play smart
-        self.__class__.delete(self)
-        # we flush immediately here as a special case ...
-        elixir.objectstore.flush()
+        @attach_to_entity
+        def exists(inst):
+            # is this right -- what happens if we did not have anything at revision
+            # and have just created something as part of the current transaction
+            # ...
+            return len(inst.history) > 0
 
+        # TODO: support for delete/purge/hibernate type stuff
+#        def delete(inst):
+#            deleted = State.get_by(name='deleted')
+#            inst.state = deleted
+#        
+#        def purge(inst):
+#            select = inst.version_class.select_by(base=inst)
+#            for rev in select:
+#                inst.version_class.delete(rev)
+#            # because we have overriden delete have to play smart
+#            inst.__class__.delete(inst)
+#            # we flush immediately here as a special case ...
+#            elixir.objectstore.flush()
+#
 
-## ------------------------------------------------------
-## Registers
+class HasRevisionedField(object):
+    """
+    How this works ...
 
-class Register(object):
-
-    def __init__(self, type, key_name):
-        self.type = type
-        self.key_name = key_name
-
-    def create(self, **kwargs):
-        return self.type(**kwargs)
-    
-    def get(self, key):
-        if self.key_name != 'id':
-            colobj = getattr(self.type.c, self.key_name)
-            query = self.type.query()
-            obj = query.selectone_by(colobj==key)
-        else:
-            obj = self.type.get(key)
-        return obj
-    
-    def delete(self, key):
-        self.purge(key)
-
-    def purge(self, key):
-        obj = self.get(key)
-        self.type.delete(obj)
-
-    def list(self):
-        return list(self.type.select())
-
-    def __iter__(self):
-        return self.list().__iter__()
-
-    def __len__(self):
-        return len(self.list())
-
-
-class VersionedDomainObjectRegister(Register):
-
-    def __init__(self, type, key_name, revision, transaction=None, **kwargs):
-        super(VersionedDomainObjectRegister, self).__init__(type, key_name)
-        self.revision = revision
-        self.transaction = transaction
-
-    def create(self, **kwargs):
-        newargs = dict(kwargs)
-        obj = self.type(**newargs)
-        obj.set_revision(self.revision, self.transaction)
-        obj._ensure_working_copy()
-        for key, value in kwargs.items():
-            setattr(obj, key, value)
-        return obj
-    
-    def get(self, key):
-        obj = super(VersionedDomainObjectRegister, self).get(key)
-        obj.set_revision(self.revision, self.transaction)
-        if obj.exists():
-            return obj
-        else:
-            msg = 'No object identified by %s exists at revision %s' % (key,
-                    self.revision)
-            raise Exception(msg)
-
-    def list(self, state='active'):
-        all_objs_ever = self.type.select()
-        results = []
-        for obj in all_objs_ever:
-            obj.set_revision(self.revision, self.transaction)
-            if obj.exists() and obj.state.name == state:
-                results.append(obj)
-        return results
-
-    def delete(self, key):
-        obj = self.get(key)
-        obj.delete()
-
-    def purge(self, key):
-        obj = self.get(key)
-        obj.purge()
-
-class KeyedRegister(VersionedDomainObjectRegister):
-    """Provide a register keyed by a certain value.
-
-    E.g. you have a package with tags and you want to do for a given instance
-    of Package (pkg say):
-
-    pkg.tags.get(tag)
+    We want to pass on versioned attribute calls to the relevant underlying
+    object.
     """
 
-    def __init__(self, *args, **kwargs):
-        kvname = kwargs['keyed_value_name']
-        kv = kwargs['keyed_value']
-        del kwargs['keyed_value_name']
-        del kwargs['keyed_value']
-        super(KeyedRegister, self).__init__(*args, **kwargs)
-        self.keyed_value_name = kvname
-        self.keyed_value = kv
-        self.other_key_name = kwargs['other_key_name']
+    def __init__(self, entity, *args, **kwargs):
+        attrname = args[0]
+        def fget(inst):
+            inst._ensure_version_operations_ok()
+            current = inst._current()
+            return getattr(current, attrname)
 
-    def create(self, **kwargs):
-        newargs = dict(kwargs)
-        newargs[self.keyed_value_name] = self.keyed_value
-        return super(KeyedRegister, self).create(**newargs)
+        def fset(inst, value):
+            # todo check we are live
+            inst._ensure_version_operations_ok()
+            inst._ensure_working_copy()
+            current = inst._current()
+            setattr(current, attrname, value)
 
-    def get(self, key):
-        # key is an object now (though could also be a name)
-        # add ID as will be a foreign key
-        objref1 = getattr(self.type.q, self.keyed_value_name + 'ID')
-        objref2 = getattr(self.type.q, self.other_key_name + 'ID')
-        sel = self.type.select(sqlobject.AND(
-            objref1 == self.keyed_value.id, objref2 == key.id)
-            )
-        sel = list(sel)
-        if len(sel) == 0:
-            msg = '%s not in this register' % key
-            raise Exception(msg)
-        # should have only one item
-        newkey = sel[0].id
-        return super(KeyedRegister, self).get(newkey)
+        print 'ADDING attributes to %s' % entity.__name__
+        setattr(entity, attrname, property(fget, fset))
 
-    def list(self, state='active'):
-        # TODO: optimize by using select directly
-        # really inefficient ...
-        all = super(KeyedRegister, self).list(state)
-        results = []
-        for item in all:
-            val = getattr(item, self.keyed_value_name)
-            if val == self.keyed_value:
-                results.append(item)
-        return results
+class IsRevision(object):
 
+    def __init__(self, entity, *args, **kwargs):
+        def copy(inst):
+            new_version = inst.__class__()
+            new_version.name = inst.name
+            new_version.base = inst.base
+            return new_version
+
+        setattr(entity, 'copy', copy)
+
+
+is_versioned = elixir.statements.Statement(IsRevisioned)
+has_versioned_field = elixir.statements.Statement(HasRevisionedField)
+is_version = elixir.statements.Statement(IsRevision)
 
