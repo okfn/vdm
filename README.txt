@@ -36,8 +36,54 @@ In particular Temporal Object:
 
   http://www.martinfowler.com/ap2/temporalObject.html
 
+We implement two approaches:
+
+  1. (simpler) Versioned domain objects are versioned independently (like a
+     wiki). This is less of a versioned 'domain model' and more of plain
+     versioned domain objects.
+  2. (more complex) Have explicit 'Revision' object and multiple objects can be
+     changed simultaneously in each revision (atomicity). This is proper
+     versioned domain model.
+
+Remark: using the first approach it is:
+
+  * Impossible to support versioning of many-to-many links between versioned
+    domain objects.
+  * It is impossible to change multiple objects 'at once' -- that is as part of
+    one atomic change
+
+### Full Versioned Domain Model
+
+With 'Revisions' we can support changing multiple objects at once. This gives
+us something very similar to the subversion object model (as encapsulated in
+their python bindings) but with a filesystem replaced by a domain model.
+
+As we need to make some distinction betwen the 'domain model' -- that is the
+objects we want to model -- and the extra apparatus we need to make this
+versioned we use the term Repository as the overarching object that holds
+references to all objects and nest the domain model within that:
+
+# everything in our 
+Repository
+    # 'helper' objects
+    Revision
+    State
+    # domain model objects
+    ...
+
+repo = Repository()
+rev = repo.new_revision()
+# change some domain objects
+rev.commit()
+
+### Code in Action
+
 To see the (sqlobject) code in action take a look at:
 
   ./vdm/sqlobject/demo_test.py
   ./vdm/sqlobject/demo.py
+
+The code for elixir, which is not yet fully functional, can be found in:
+
+  ./vdm/elixir/
 
