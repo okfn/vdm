@@ -31,6 +31,7 @@ def setup():
         has_and_belongs_to_many('movies', of_kind='Movie', inverse='actors', tablename='movie_casting')
         using_options(tablename='actors')
 
+    setup_all()
     metadata.bind = 'sqlite:///'
 
 
@@ -54,13 +55,12 @@ class TestVersioning(object):
         assert rev1.session.revision == rev1
 
         gilliam = Director(name='Terry Gilliam')
-        session = sqlalchemy.object_session(gilliam)
         monkeys = Movie(id=1, title='12 Monkeys', description='draft description', director=gilliam)
         bruce = Actor(name='Bruce Willis', movies=[monkeys])
         rev1.commit()
         objectstore.clear()
 
-        rev1out = cx.Revision.get(1)
+        rev1out = cx.Revision.get_by(id=1)
         movie = Movie.get_by(title='12 Monkeys')
         assert movie.revision == rev1out
         objectstore.clear()
@@ -127,7 +127,8 @@ class TestVersioning(object):
         differences = latest_version.compare_with(oldest_version)
         assert differences['description'] == ('description three', 'draft description')
     
-        assert len(movie.versions) == 2
+        print len(movie.versions)
+        assert len(movie.versions) == 3
         assert movie.versions[0] == oldest_version
         assert movie.versions[1] == middle_version
     

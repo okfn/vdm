@@ -4,16 +4,16 @@ A versioning plugin for Elixir.
 Supports changes to multiple objects and relationships in a single
 revision/version.
 '''
+from datetime              import datetime
+import inspect
+
+from sqlalchemy            import Table, Column, and_, desc
+from sqlalchemy.orm        import mapper, MapperExtension, EXT_PASS, \
+                                  object_session
+
 import elixir
-import sqlalchemy
 from elixir                import Integer, DateTime
 from elixir.statements     import Statement
-from elixir.fields         import Field
-from sqlalchemy            import Table, Column, and_, desc
-from sqlalchemy.orm        import mapper, MapperExtension, EXT_PASS
-from datetime              import datetime
-
-import inspect
 
 
 #
@@ -54,8 +54,10 @@ class Revision(elixir.Entity):
 
     def __init__(self):
         super(Revision, self).__init__()
-        import sqlalchemy
-        self.session = sqlalchemy.object_session(self)
+        # elixir has only one ScopedSession in the thread ... 
+        # could just use this:
+        # self.session = elixir.session
+        self.session = object_session(self)
         # TODO: check if session already has a revision
         # if so raise an error
         self.session.revision = self
@@ -76,7 +78,10 @@ class Revision(elixir.Entity):
 class VersionedMapperExtension(MapperExtension):
 
     def _set_revision(self, instance):
-        session = sqlalchemy.object_session(instance)
+        # elixir >= 0.4 has ScopedSession session always around
+        # could just use that
+        # session = elixir.session
+        session = object_session(instance)
         if session.revision is None:
             msg = 'Versioning impossible as no revision has been set for this session'
             raise Exception(msg)
@@ -89,14 +94,47 @@ class VersionedMapperExtension(MapperExtension):
         self._set_revision(instance)
         instance.timestamp = datetime.now()
         return EXT_PASS
+
+    def after_insert(self, mapper, connection, instance):
+        colvalues = dict([(key, getattr(instance, key)) 
+                          for key in instance.c.keys()])
+        instance.__class__.__history_table__.insert().execute(colvalues)
+        return EXT_PASS
     
-    def before_update(self, mapper, connection, instance):        
+    def before_update(self, mapper, connection, instance):
         self._set_revision(instance)
         instance.timestamp = datetime.now()
-        # copy old value into history
-        values = instance.table.select(get_entity_where(instance)).execute().fetchone()
-        colvalues = dict(values.items())
-        instance.__class__.__history_table__.insert().execute(colvalues)
+        colvalues = dict([(key, getattr(instance, key)) 
+                          for key in instance.c.keys()])
+        history = instance.__class__.__history_table__
+        
+        values = history.select(get_history_where(instance), 
+                                order_by=[desc(history.c.timestamp)],
+                                limit=1).execute().fetchone()
+        # In case the data was dumped into the db, the initial version might 
+        # be missing so we put this version in as the original.
+        if not values:
+            # instance.version = colvalues['version'] = 1
+            instance.timestamp = colvalues['timestamp'] = datetime.now()
+            history.insert().execute(colvalues)
+            return EXT_PASS
+        
+        # SA might've flagged this for an update even though it didn't change.
+        # This occurs when a relation is updated, thus marking this instance
+        # for a save/update operation. We check here against the last version
+        # to ensure we really should save this version and update the version
+        # data.
+        ignored = instance.__class__.__ignored_fields__
+        for key in instance.c.keys():
+            if key in ignored:
+                continue
+            if getattr(instance, key) != values[key]:
+                # the instance was really updated, so we create a new version
+                # instance.version = colvalues['version'] = instance.version + 1
+                instance.timestamp = colvalues['timestamp'] = datetime.now()
+                history.insert().execute(colvalues)
+                break
+
         return EXT_PASS
     
     def before_delete(self, mapper, connection, instance):
@@ -115,15 +153,30 @@ versioned_mapper_extension = VersionedMapperExtension()
 
 class ActsAsVersioned(object):
         
-    def __init__(self, entity):
+    # use ignore=None rather than ignore=[] to avoid problems with defaults
+    # shared across objects
+    def __init__(self, entity, ignore=[]):
         entity._descriptor.add_mapper_extension(versioned_mapper_extension)
-        
-        timestampField = Field(DateTime, colname='timestamp')
-        entity._descriptor.add_field(timestampField)
-        # will auto attach to the entity in question
-        revisionField = elixir.relationships.BelongsTo(entity=entity,
-                name='revision', of_kind='vdm.elixir.complex.Revision')
         self.entity = entity
+        if not ignore:
+            ignore = []
+        entity.__ignored_fields__ = ignore
+        entity.__ignored_fields__.extend(['version', 'timestamp'])
+        # will auto attach to the entity in question
+        # revisionField = elixir.relationships.ManyToOne(entity=entity,
+        #        name='revision', of_kind='vdm.elixir.complex.Revision')
+        # based on lines in
+        # http://elixir.ematia.de/trac/browser/elixir/trunk/elixir/properties.py
+        # class Property: def attach
+        newproperty = elixir.relationships.ManyToOne('Revision')
+        newproperty.attach(entity=entity, name='revision')
+
+    def create_non_pk_cols(self):
+        # add a version column to the entity, along with a timestamp
+        version_col = Column('version', Integer)
+        timestamp_col = Column('timestamp', DateTime)
+        self.entity._descriptor.add_column(version_col)
+        self.entity._descriptor.add_column(timestamp_col)
     
     def after_table(self):
         entity = self.entity
@@ -159,45 +212,36 @@ class ActsAsVersioned(object):
                         
         # attach utility methods and properties to the entity
         def get_versions(self):
-            return entity._descriptor.objectstore.query(Version).select(get_history_where(self))
+            return object_session(self).query(Version) \
+                                       .filter(get_history_where(self)) \
+                                       .all()
         
         def get_as_of(self, dt):
             # if the passed in timestamp is older than our current version's
             # time stamp, then the most recent version is our current version
-            if self.timestamp < dt: return self
+            if self.timestamp < dt:
+                return self
             
             # otherwise, we need to look to the history table to get our
             # older version
-            items = entity._descriptor.objectstore.query(Version).select(
-                and_(get_history_where(self), Version.c.timestamp <= dt),
-                order_by=desc(Version.c.timestamp),
-                limit=1
-            )
-            if items: return items[0]
-            else: return None
+            query = object_session(self).query(Version)
+            query = query.filter(and_(get_history_where(self), 
+                                      Version.c.timestamp <= dt))
+            query = query.order_by(desc(Version.c.timestamp)).limit(1)
+            return query.first()
         
+        
+# remove for time being
 #        def revert_to(self, to_version):
-#            hist = entity.__history_table__
-#            old_version = hist.select(and_(
-#                get_history_where(self), 
-#                hist.c.version==to_version
-#            )).execute().fetchone()
-#            
-#            entity.table.update(get_entity_where(self)).execute(
-#                dict(old_version.items())
-#            )
-#            
-#            hist.delete(and_(get_history_where(self), hist.c.version>=to_version)).execute()
-#            for event in after_revert_events: event(self)
         
+# ditto
 #        def revert(self):
-#            assert self.version > 1
-#            self.revert_to(self.version - 1)
             
         def compare_with(self, version):
             differences = {}
             for column in self.c:
-                if column.name == 'version': continue
+                if column.name == 'version':
+                    continue
                 this = getattr(self, column.name)
                 that = getattr(version, column.name)
                 if this != that:
