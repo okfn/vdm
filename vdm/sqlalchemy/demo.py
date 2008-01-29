@@ -13,7 +13,7 @@ from datetime import datetime
 from sqlalchemy import *
 # from sqlalchemy import create_engine
 
-from vdm.sqlalchemy.base import Revisioner, set_revision, get_revision, RevisionedObjectMixin
+from vdm.sqlalchemy.base import *
 
 engine = create_engine('sqlite:///:memory:',
         # echo=True
@@ -63,20 +63,9 @@ package_tag_table = Table('package_tag', metadata,
         Column('tag_id', Integer, ForeignKey('tag.id'), primary_key=True),
         )
 
-def make_rev_table(base_table):
-    base_table.append_column(
-            Column('revision_id', Integer, ForeignKey('revision.id'))
-            )
-    columns = [ col.copy() for col in base_table.c ]
-    for col in columns:
-        if col.name == 'revision_id':
-            col.primary_key = True
-    newtable = Table(base_table.name + '_revision', base_table.metadata,
-            *columns)
-    return newtable
 
-license_revision_table = make_rev_table(license_table)
-package_revision_table = make_rev_table(package_table)
+license_revision_table = make_revision_table(license_table)
+package_revision_table = make_revision_table(package_table)
 
 metadata.create_all(engine) 
 
@@ -96,7 +85,7 @@ class Revision(object):
     def __repr__(self):
         return '<Revision %s>' % self.id 
 
-class License(object):
+class License(RevisionedObjectMixin):
     def __init__(self, **kwargs):
         for k,v in kwargs.items():
             setattr(self, k, v)
@@ -117,7 +106,8 @@ class Tag(object):
         return '<Tag %s>' % self.name
 
 
-
+## --------------------------------------------------------
+## Mapper Stuff
 
 from sqlalchemy.orm import scoped_session, sessionmaker, create_session
 from sqlalchemy.orm import relation, backref#, secondary
@@ -133,23 +123,6 @@ mapper = SessionObject.mapper
 
 mapper(State, state_table)
 mapper(Revision, revision_table)
-
-
-## -----------------------------
-## Helpers
-
-def create_object_version(base_object, rev_table):
-    class MyClass(object):
-        pass
-    name = base_object.__name__ + 'Revision'
-    MyClass.__name__ = name
-    base_object.__revision_object__ = MyClass
-    # TODO: properties (copy?)
-    mapper(MyClass, rev_table) 
-    return MyClass
-
-## -----------------------------
-## Concrete
 
 mapper(License, license_table, properties={
     'revision':relation(Revision),
@@ -167,9 +140,9 @@ mapper(Package, package_table, properties={
 
 mapper(Tag, tag_table)
 
-PackageRevision = create_object_version(Package,
+PackageRevision = create_object_version(mapper, Package,
         package_revision_table)
 
-LicenseRevision = create_object_version(License,
+LicenseRevision = create_object_version(mapper, License,
         license_revision_table)
 

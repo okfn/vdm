@@ -2,12 +2,14 @@ from sqlalchemy.orm import object_session
 
 from demo import *
 
-def test_0():
+def test_make_revision_table():
     assert package_revision_table.name == 'package_revision'
     print package_revision_table.c
     assert 'state_id' in package_revision_table.c
+    assert 'revision_id' in package_table.c
+    assert len(package_revision_table.c) == len(package_table.c) + 1
 
-def test_1():
+def test_accessing_columns_on_object():
     print Package.c.keys()
     assert len(Package.c.keys()) > 0
     print Package.c.keys()
@@ -72,6 +74,13 @@ class TestMain:
         assert p1.revision.timestamp == self.ts2
         assert p1.tags == []
 
+    def test_basic_3(self):
+        p1 = Package.query.filter_by(name=self.name1).one()
+        pr1 = PackageRevision.query.filter_by(name=self.name1).first()
+        print pr1.c.keys()
+        print pr1.continuity_id
+        assert pr1.continuity == p1
+
     def test_versioning_1(self):
         p1 = Package.query.filter_by(name=self.name1).one()
         rev1 = Revision.query.get(self.rev1_id)
@@ -83,6 +92,11 @@ class TestMain:
         p1 = Package.query.filter_by(name=self.name1).one()
         rev1 = Revision.query.get(self.rev1_id)
         p1r1 = p1.get_as_of(rev1)
-        # assert p1r1.license.open == True
+        assert p1r1.license.open == True
+
+    def test_versioning_m2m(self):
+        p1 = Package.query.filter_by(name=self.name1).one()
+        rev1 = Revision.query.get(self.rev1_id)
+        p1r1 = p1.get_as_of(rev1)
         # assert len(p1r1.tags) == 0
 
