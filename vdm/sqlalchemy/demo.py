@@ -26,8 +26,6 @@ state_table = Table('state', metadata,
         Column('name', String(8))
         )
 
-state_col = Column('state_id', Integer, ForeignKey('state.id'))
-
 revision_table = Table('revision', metadata,
         Column('id', Integer, primary_key=True),
         Column('timestamp', DateTime, default=datetime.now),
@@ -40,7 +38,6 @@ license_table = Table('license', metadata,
         Column('id', Integer, primary_key=True),
         Column('name', String(100)),
         Column('open', Boolean),
-        state_col.copy()
         )
 
 package_table = Table('package', metadata,
@@ -48,13 +45,11 @@ package_table = Table('package', metadata,
         Column('name', String(100)),
         Column('title', String(100)),
         Column('license_id', Integer, ForeignKey('license.id')),
-        state_col.copy(),
 )
 
 tag_table = Table('tag', metadata,
         Column('id', Integer, primary_key=True),
         Column('name', String(100)),
-        state_col.copy()
 )
 
 package_tag_table = Table('package_tag', metadata,
@@ -64,8 +59,16 @@ package_tag_table = Table('package_tag', metadata,
         )
 
 
+make_stateful(license_table)
+make_stateful(package_table)
+make_stateful(tag_table)
+make_stateful(package_tag_table)
 license_revision_table = make_revision_table(license_table)
 package_revision_table = make_revision_table(package_table)
+tag_revision_table = make_revision_table(tag_table)
+# TODO: this has a composite primary key ...
+# package_tag_revision_table = make_revision_table(package_tag_table)
+
 
 metadata.create_all(engine) 
 
@@ -76,7 +79,10 @@ metadata.create_all(engine)
         
 
 class State(object):
-    pass
+
+    def __repr__(self):
+        return '<State %s>' % self.name
+    
 
 class Revision(object):
     # TODO:? set timestamp in ctor ... (maybe not as good to have undefined
@@ -90,7 +96,9 @@ class License(RevisionedObjectMixin):
         for k,v in kwargs.items():
             setattr(self, k, v)
 
-class Package(RevisionedObjectMixin):
+class Package(RevisionedObjectMixin, StatefulObjectMixin):
+    # TODO: complete hack this has got to be set up in some nicer fashion
+    State = State
     def __init__(self, **kwargs):
         for k,v in kwargs.items():
             setattr(self, k, v)
@@ -125,13 +133,11 @@ mapper(State, state_table)
 mapper(Revision, revision_table)
 
 mapper(License, license_table, properties={
-    'revision':relation(Revision),
     },
     extension=Revisioner(license_revision_table)
     )
 
 mapper(Package, package_table, properties={
-    'revision':relation(Revision),
     'license':relation(License),
     'tags':relation(Tag, secondary=package_tag_table),
     },
@@ -140,9 +146,14 @@ mapper(Package, package_table, properties={
 
 mapper(Tag, tag_table)
 
+modify_base_object_mapper(Package, Revision, State)
+modify_base_object_mapper(License, Revision, State)
 PackageRevision = create_object_version(mapper, Package,
         package_revision_table)
 
 LicenseRevision = create_object_version(mapper, License,
         license_revision_table)
+
+ACTIVE = State(id=1, name='active').name
+DELETED = State(id=2, name='deleted').name
 
