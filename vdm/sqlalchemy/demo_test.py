@@ -91,7 +91,6 @@ def test_table_copy():
 
 def test_package_tag_table():
     col = package_tag_table.c['tag_id']
-    assert col.primary_key
     assert len(col.foreign_keys) == 1
 
 def test_make_stateful():

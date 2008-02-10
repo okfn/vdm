@@ -7,6 +7,7 @@ TODO
     * At very least do we not need to update timestamps?
     * Could have rule that flush ends revision.
 
+2. Test for revision object
 '''
 from datetime import datetime
 
@@ -53,9 +54,9 @@ tag_table = Table('tag', metadata,
 )
 
 package_tag_table = Table('package_tag', metadata,
-        Column('package_id', Integer, ForeignKey('package.id'),
-            primary_key=True),
-        Column('tag_id', Integer, ForeignKey('tag.id'), primary_key=True),
+        Column('id', Integer, primary_key=True),
+        Column('package_id', Integer, ForeignKey('package.id')),
+        Column('tag_id', Integer, ForeignKey('tag.id')),
         )
 
 
@@ -67,7 +68,7 @@ license_revision_table = make_revision_table(license_table)
 package_revision_table = make_revision_table(package_table)
 tag_revision_table = make_revision_table(tag_table)
 # TODO: this has a composite primary key ...
-# package_tag_revision_table = make_revision_table(package_tag_table)
+package_tag_revision_table = make_revision_table(package_tag_table)
 
 
 metadata.create_all(engine) 

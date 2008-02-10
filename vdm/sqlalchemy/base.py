@@ -1,3 +1,12 @@
+'''Versioned Domain Model for sqlalchemy.
+
+Current restrictions:
+
+    * No support for composite primary keys.
+
+'''
+
+
 # make explicit to avoid errors from typos (no attribute defns in python!)
 def set_revision(session, revision):
     session.revision = revision
@@ -163,7 +172,7 @@ def create_object_version(mapper_fn, base_object, rev_table):
     base_mapper = class_mapper(base_object)
     # add in 'relationship' stuff from continuity onto revisioned obj
     # If related object is revisioned ok
-    # If not can support simply relation but not anything else
+    # If not can support simple relation but nothing else
     for prop in base_mapper.iterate_properties:
         is_relation = prop.__class__ == sqlalchemy.orm.properties.PropertyLoader
         if is_relation:
