@@ -92,3 +92,8 @@ class TestStatefulList:
         assert self.sa in self.slist
         assert self.sb not in self.slist
 
+    def test_clear(self):
+        self.slist.clear()
+        assert len(self.slist) == 0
+
+
