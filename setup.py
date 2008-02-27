@@ -8,7 +8,7 @@ setup(
     name = 'vdm',
     version = __version__,
     packages = find_packages(),
-    install_requires = [ 'SQLObject >= 0.7' ],
+    install_requires = [ ],
     scripts = [],
 
     # metadata for upload to PyPI
@@ -17,9 +17,9 @@ setup(
     description = __description__,
     long_description = __long_description__,
     license = "MIT",
-    keywords = "versioning subversion python sqlobject",
-    url = "http://p.knowledgeforge.net/ckan/svn/vdm/", 
-    download_url = "http://p.knowledgeforge.net/ckan/svn/vdm/trunk",
+    keywords = "versioning sqlobject sqlachemy",
+    url = "http://knowledgeforge.net/ckan/svn/vdm/", 
+    download_url = "http://knowledgeforge.net/ckan/svn/vdm/trunk",
     classifiers = [
         'Development Status :: 3 - Alpha',
         'Environment :: Console',

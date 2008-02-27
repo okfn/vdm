@@ -9,12 +9,10 @@ of SQLObject so that those already familiar with SQLObject for creating domain
  models will find it easy to use the versioning facilities provided by this
  library.
 
-For a demo of how to use package see vdm/demo.py and vdm/demo_test.py.
-
 
 ## Copyright and License
 
-(c) 2007 The Open Knowledge Foundation
+(c) 2007-2008 The Open Knowledge Foundation
 
 Licensed under the MIT license:
 
