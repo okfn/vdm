@@ -235,5 +235,6 @@ class TestMain:
         p1 = Package.query.filter_by(name=self.name1).one()
         rev1 = Revision.query.get(self.rev1_id)
         p1r1 = p1.get_as_of(rev1)
-        # assert len(p1r1.tags) == 0
+        assert len(p1r1.tags) == 0
+        # TODO: more testing of the m2m relation ...
 

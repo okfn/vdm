@@ -1,22 +1,40 @@
 import itertools
 class StatefulList(object):
 
-    def __init__(self, baselist, is_active, delete, undelete,
-            base_modifier=None):
+    def __init__(self, target_list, **kwargs):
         '''
+        Possible kwargs:
+        
+        is_active, delete, undelete: a method performing the relevant operation
+            on the underlying stateful objects. If these are not provided they
+            will be created on the basis that there is a corresponding method
+            on the stateful object (e.g. one can do obj.is_active()
+            obj.delete() etc.
+
         base_modifier: function to operate on base objects before any
-        processing. e.g. could have function:
+            processing. e.g. could have function:
             def get_as_of(x):
                 return x.get_as_of(revision)
         '''
-        self.baselist = baselist
-        self._undelete = undelete 
-        self._delete = delete
-        self._is_active = is_active
-        if base_modifier is None:
-            self._base_modifier = lambda x: x
-        else:
-            self._base_modifier = base_modifier
+        self.baselist = target_list 
+
+        extra_args = ['is_active', 'delete', 'undelete', 'base_modifier']
+        for argname in extra_args:
+            setattr(self, argname, kwargs.get(argname, None))
+        if self.is_active is None:
+            self.is_active = lambda x: x.is_active()
+        if self.delete is None:
+            self.delete = lambda x: x.delete()
+        if self.undelete is None:
+            self.undelete = lambda x: x.undelete()
+        if self.base_modifier is None:
+            self.base_modifier = lambda x: x
+        self._set_stateful_operators()
+
+    def _set_stateful_operators(self):
+        self._is_active = self.is_active
+        self._delete = self.delete
+        self._undelete = self.undelete
 
     def _get_base_index(self, myindex):
         # if we knew items were unique could do
@@ -25,14 +43,18 @@ class StatefulList(object):
         basecount = -1
         for item in self.baselist:
             basecount += 1
-            if self._is_active(self._base_modifier(item)):
+            if self._is_active(self.base_modifier(item)):
                 count += 1
             if count == myindex:
                 return basecount
         raise IndexError
 
     def append(self, obj):
-        # check if the list already has it
+        # TODO: use base_modifier
+        # TODO: not clear what happens if we have 'same' object in different
+        # states i.e. i re-add the same object but with a different state then
+        # ends up with two different object in the system which is maybe not
+        # what we want ... (this needs some careful checking)
         if obj in self.baselist:
             if self._is_active(obj):
                 # assume unique items in list o/w not meaningful
@@ -52,7 +74,7 @@ class StatefulList(object):
 
     def __getitem__(self, index):
         baseindex = self._get_base_index(index)
-        return self._base_modifier(self.baselist[baseindex])
+        return self.base_modifier(self.baselist[baseindex])
     
     def __item__(self, index):
         return self.__getitem__(self, index)
@@ -129,15 +151,27 @@ class StatefulList(object):
     
     def __repr__(self):
         return repr(self.copy())
+
+
+class StatefulListDeleted(StatefulList):
+
+    def _set_stateful_operators(self):
+        self._is_active = lambda x: not self.is_active(x)
+        self._delete = self.undelete
+        self._undelete = self.delete
+
     
 class StatefulListProperty(object):
-    def __init__(self, target_list, is_active, delete, undelete):
-        self.target_list = target_list
-        self.is_active = is_active
-        self.delete = delete
-        self.undelete = undelete
+    def __init__(self, target_list_name, stateful_class=StatefulList, **kwargs):
+        '''Turn StatefulList into a property to allowed for deferred access.
+
+        For details of other args see L{StatefulList}.
+        '''
+        self.target_list_name = target_list_name
+        self.stateful_class = stateful_class
+        self.cached_kwargs = kwargs
         self.cached_instance_key = '_%s_%s_%s' % (type(self).__name__,
-                target_list, id(self))
+                self.target_list_name, id(self))
 
     def __get__(self, obj, class_):
         try:
@@ -145,9 +179,8 @@ class StatefulListProperty(object):
             return getattr(obj, self.cached_instance_key)
         except AttributeError:
             # probably should do this using lazy_collections a la assoc proxy
-            baselist = getattr(obj, self.target_list)
-            stateful_list = StatefulList(baselist, self.is_active, self.delete,
-                    self.undelete)
+            target_list = getattr(obj, self.target_list_name)
+            stateful_list = self.stateful_class(target_list, **self.cached_kwargs)
             # cache
             setattr(obj, self.cached_instance_key, stateful_list)
             return stateful_list
@@ -155,6 +188,7 @@ class StatefulListProperty(object):
     def __set__(self, obj, values):
         # TODO: assign to whole underlying mapper
         raise NotImplementedException()
+
 
 import sqlalchemy.ext.associationproxy
 import weakref
@@ -179,3 +213,50 @@ class OurAssociationProxy(sqlalchemy.ext.associationproxy.AssociationProxy):
         if proxy is not values:
             proxy.clear()
             self._set(proxy, values)
+
+
+def add_stateful_m2m(object_to_alter, m2m_object, m2m_property_name,
+        attr, basic_m2m_name, **kwargs):
+    '''Attach active and deleted stateful properties and a basic assocition
+    proxy based on a relation pointing to a simple m2m objec.
+
+    To illustrate if one has:
+
+    class Package(object):
+
+        # package_licenses come from a simple relation pointing to
+        # PackageLicense and returns PackageLicense objects (so do *not* use
+        # secondary keyword)
+        # Thus it will usually not be defined here but in the mapper
+        
+        # package_licenses
+
+    Then after running:
+        add_stateful_m2m(Package, PackageLicense, 'licenses', 'license',
+        'package_licenses')
+    
+    there will be additional properites:
+
+        licenses_active
+        licenses_deleted
+        licenses
+
+    **kwargs: these are passed on to the StatefulListProperty.
+    '''
+
+    def create_m2m(foreign):
+        mykwargs = {}
+        mykwargs[attr] = foreign
+        return m2m_object(**mykwargs)
+
+    active_name = m2m_property_name + '_active'
+    active_prop = StatefulListProperty(basic_m2m_name, **kwargs)
+    deleted_name = m2m_property_name + '_deleted'
+    deleted_prop = StatefulListProperty(basic_m2m_name, StatefulListDeleted,
+            **kwargs)
+    setattr(object_to_alter, active_name, active_prop)
+    setattr(object_to_alter, deleted_name, deleted_prop)
+    setattr(object_to_alter, m2m_property_name,
+            OurAssociationProxy(active_name, attr, creator=create_m2m)
+            )
+

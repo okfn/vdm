@@ -86,18 +86,48 @@ def make_revision_table(base_table):
 ## --------------------------------------------------------
 ## Object Helpers
 
+class State(object):
+
+    def __repr__(self):
+        return '<State %s>' % self.name
+
+def make_State(mapper, state_table):
+    mapper(State, state_table)
+    return State
+
+class Revision(object):
+    # TODO:? set timestamp in ctor ... (maybe not as good to have undefined
+    # until actual save ...)
+
+    def __repr__(self):
+        return '<Revision %s>' % self.id 
+
+def make_Revision(mapper, revision_table):
+    mapper(Revision, revision_table)
+    return Revision
 
 class StatefulObjectMixin(object):
 
     __stateful__ = True
+    # TODO: complete hack this has got to be set up in some nicer fashion
+    state_obj = State
 
     def delete(self):
         # HACK: how do we get the real value without having State object
         # available ...
-        deleted = self.State.query.get(2)
+        deleted = self.state_obj.query.get(2)
         self.state = deleted
     
-    # TODO: purge and undelete
+    def undelete(self):
+        active = self.state_obj.query.get(1)
+        self.state = active
+
+    def is_active(self):
+        # also support None in case this object is not yet refreshed ...
+        active = self.state_obj.query.get(1)
+        return self.state is None or self.state == active
+
+    # TODO: purge
 
 
 class RevisionedObjectMixin(object):
@@ -119,27 +149,39 @@ class RevisionedObjectMixin(object):
         set_revision(sess, revision)
 
     def get_as_of(self, revision=None):
-        # TODO: work out what happens if we start calling this when a
-        # 'transactional' revision is active (i.e. we doing new stuff)
+        '''Get this domain object at the specified revision.
+        
+        If no revision is specified revision will be looked up on the global
+        session object. If that not found return head.
 
+        get_as_of does most of the crucial work in supporting the
+        versioning.
+        '''
         if revision:
             # set revision on the session so dom traversal works
+            # TODO: should we assert revision.id?
             self._set_revision(revision)
         else:
             revision = self._get_revision()
-            assert revision
-        revision_object = self.__revision_object__
-        # exploit orderings of ids
-        out = revision_object.query.filter(
-                revision_object.revision_id <= revision.id
-                ).filter(
-                    revision_object.id == self.id
-                    )
-        if out.count() == 0:
-            return None
+        # if revision is None or does not have an id (implies in transaction)
+        # then we should use head (i.e. continuity object since this caches
+        # head)
+        at_head = (revision is None or revision.id is None)
+        if at_head:
+            return self
         else:
-            return out.first()
-    
+            revision_class = self.__revision_class__
+            # exploit orderings of ids
+            out = revision_class.query.filter(
+                    revision_class.revision_id <= revision.id
+                    ).filter(
+                        revision_class.id == self.id
+                        )
+            if out.count() == 0: # object does not exist yet
+                return None
+            else:
+                return out.first()
+
 
 ## --------------------------------------------------------
 ## Mapper Helpers
@@ -164,7 +206,7 @@ def create_object_version(mapper_fn, base_object, rev_table):
     MyClass.__name__ = name
     MyClass.__base_class__ = base_object
     # TODO: add revision relation here (rather than explicitly below)
-    base_object.__revision_object__ = MyClass
+    base_object.__revision_class__ = MyClass
 
     ourmapper = mapper_fn(MyClass, rev_table, properties={
         'continuity':relation(base_object),
@@ -179,10 +221,10 @@ def create_object_version(mapper_fn, base_object, rev_table):
             prop_remote_obj = prop.select_mapper.class_
             remote_obj_is_revisioned = getattr(prop_remote_obj, '__revisioned__', False)
             # this is crude, probably need something better
-            is_m2m = (prop.secondary != None)
+            is_m2m = (prop.secondary != None or prop.uselist)
             if remote_obj_is_revisioned:
-                name = prop.key
-                add_fake_relation(MyClass, name)
+                propname = prop.key
+                add_fake_relation(MyClass, propname)
             elif not is_m2m:
                 # import pprint
                 # if prop.key == 'tags':
@@ -194,13 +236,37 @@ def create_object_version(mapper_fn, base_object, rev_table):
 
     return MyClass
 
-def add_fake_relation(revision_class, name): 
+def add_fake_relation(revision_class, name, m2m=False): 
     def _pget(self):
         related_object = getattr(self.continuity, name)
         # will use whatever the current session.revision is
-        return related_object.get_as_of()
+        if m2m:
+            # with m2m get_as_of already implemented inside the m2m relation
+            return related_object
+        else:
+            return related_object.get_as_of()
     x = property(_pget)
     setattr(revision_class, name, x)
+
+from stateful import add_stateful_m2m
+def add_stateful_versioned_m2m(*args, **kwargs):
+    '''Add a Stateful versioned m2m attributes to a domain object.
+    
+    For args and kwargs see add_stateful_m2m.
+    '''
+    def get_as_of(obj):
+        return obj.get_as_of()
+
+    newkwargs = dict(kwargs)
+    newkwargs['base_modifier'] = get_as_of
+    add_stateful_m2m(*args, **newkwargs)
+
+def add_stateful_versioned_m2m_on_version(revision_class, m2m_property_name):
+    active_name = m2m_property_name + '_active'
+    deleted_name = m2m_property_name + '_deleted'
+    for propname in [active_name, deleted_name, m2m_property_name]:
+        add_fake_relation(revision_class, propname,
+                m2m=True)
 
 
 from sqlalchemy.orm import MapperExtension

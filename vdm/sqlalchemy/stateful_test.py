@@ -1,33 +1,38 @@
-from stateful import StatefulList
+from stateful import *
+
+ACTIVE = 'active'
+DELETED = 'deleted'
+
+
+class Stateful(object):
+    def __init__(me, name='', state=ACTIVE):
+        me.name = name
+        me.state = state
+        
+    def delete(me):
+        me.state = DELETED
+
+    def undelete(me):
+        me.state = ACTIVE
+
+    def __repr__(me):
+        return '<Stateful %s %s>' % (me.name, me.state)
+
+def delete(st):
+    st.delete()
+
+def undelete(st):
+    st.undelete()
+
+def is_active(st):
+    return st.state == ACTIVE
+
 
 class TestStatefulList:
 
     def setup_method(self, name=''):
-        self.active = 'active'
-        self.deleted = 'deleted'
-
-        class Stateful(object):
-            def __init__(me, name='', state=self.active):
-                me.name = name
-                me.state = state
-                
-            def delete(me):
-                me.state = self.deleted
-
-            def undelete(me):
-                me.state = self.active
-
-            def __repr__(me):
-                return '<Stateful %s %s>' % (me.name, me.state)
-
-        def delete(st):
-            st.delete()
-
-        def undelete(st):
-            st.undelete()
-
-        def is_active(st):
-            return st.state == self.active
+        self.active = ACTIVE
+        self.deleted = DELETED
 
         self.sb = Stateful('b', state=self.deleted)
         self.testlist = [
@@ -39,7 +44,9 @@ class TestStatefulList:
         self.sa = self.testlist[0]
         self.se = Stateful('e')
         self.sf = Stateful('f')
-        self.slist = StatefulList(self.testlist, is_active, delete, undelete)
+        self.slist = StatefulList(self.testlist, is_active=is_active)
+        # TODO: more testing of StatefulListDeleted
+        self.slist_deleted = StatefulListDeleted(self.testlist, is_active=is_active)
 
     def test__get_base_index(self):
         exp = [0, 3]
@@ -51,6 +58,7 @@ class TestStatefulList:
     def test___len__(self):
         assert len(self.testlist) == 4
         assert len(self.slist) == 2
+        assert len(self.slist_deleted) == 2
 
     def test___get_item__(self):
         assert self.slist[1] == self.testlist[3]

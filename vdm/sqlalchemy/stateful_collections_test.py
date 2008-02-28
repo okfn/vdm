@@ -13,8 +13,7 @@ license_table = Table('license', metadata,
         )
 
 package_table = Table('package', metadata,
-        Column('id', Integer, primary_key=True),
-        Column('name', String(100)),
+        Column('id', String(100), primary_key=True),
 )
 
 package_license_table = Table('package_license', metadata,
@@ -50,27 +49,20 @@ def undelete(st):
 def is_active(st):
     return st.state == 'active'
 
-class StatefulListProxy(object):
-    def __init__(self, target):
-        self.target = target
-
-    def __get__(self, obj, class_):
-        return Stateful
-
 def _create_pl_by_license(license):
     return PackageLicense(license=license)
 
 class Package(BaseObject):
 
-    def __init__(self, name=''):
-        self.name = name
+    def __init__(self, id):
+        self.id = id
 
-    active_licenses = StatefulListProperty('package_licenses', is_active,
-            delete, undelete)
-    deleted_licenses = StatefulListProperty('package_licenses', lambda x: not is_active(x),
-            undelete, delete)
-    licenses = OurAssociationProxy('active_licenses', 'license',
-        creator=_create_pl_by_license)
+#     licenses_active = StatefulListProperty('package_licenses', is_active,
+#             delete, undelete)
+#     licenses_deleted = StatefulListProperty('package_licenses', lambda x: not is_active(x),
+#             undelete, delete)
+#     licenses = OurAssociationProxy('licenses_active', 'license',
+#         creator=_create_pl_by_license)
     licenses2 = association_proxy('package_licenses', 'license',
             creator=_create_pl_by_license)
 
@@ -88,6 +80,19 @@ class PackageLicense(object):
         return '<PackageLicense %s %s %s %s>' % (self.id, self.package,
                 self.license, self.state)
 
+    # for testing versioned m2m
+    def get_as_of(self):
+        return self
+
+add_stateful_m2m(Package, PackageLicense,  'licenses', 'license',
+        'package_licenses', is_active=is_active, delete=delete,
+        undelete=undelete)
+from base import add_stateful_versioned_m2m
+add_stateful_versioned_m2m(Package, PackageLicense,  'licenses3', 'license',
+        'package_licenses', is_active=is_active, delete=delete,
+        undelete=undelete)
+
+
 mapper(Package, package_table, properties={
     'package_licenses':relation(PackageLicense),
     })
@@ -101,61 +106,115 @@ mapper(PackageLicense, package_license_table, properties={
 class TestStatefulCollections(object):
 
     def setup_class(self):
-        pkg1 = Package()
+        pkg1 = Package('pkg1')
         lic1 = License('a')
         lic2 = License('b')
         lic3 = License('c')
         lic4 = License('d')
-        # for lic in [lic1, lic2, lic3]:
-        #    pkg1.licenses.append(lic)
-        # pkg1.licenses = [lic1, lic2, lic3]
+        self.license_list = [ lic1, lic2, lic3, lic4 ]
         for li in [lic1, lic2, lic3, lic4]:
-            pkg1.active_licenses.append(PackageLicense(pkg1, li))
-        del pkg1.active_licenses[3]
+            pkg1.licenses_active.append(PackageLicense(pkg1, li))
+        del pkg1.licenses_active[3]
         session.flush()
         session.clear()
 
-    def test_0(self):
-        pkg1 = Package.query.get(1)
+    def test_package_licenses(self):
+        pkg1 = Package.query.get('pkg1')
         assert len(pkg1.package_licenses) == 4
         assert pkg1.package_licenses[-1].state == 'deleted'
 
-    def test_1(self):
-        p1 = Package.query.get(1)
+    def test_licenses(self):
+        p1 = Package.query.get('pkg1')
         assert len(p1.licenses) == 3
 
-    def test_2(self):
-        p1 = Package.query.get(1)
-        assert len(p1.active_licenses) == 3
-        assert len(p1.deleted_licenses) == 1
-        p1.deleted_licenses.append(PackageLicense(license=License('e')))
-        assert len(p1.active_licenses) == 3
-        assert len(p1.deleted_licenses) == 2
+    def test_active_deleted_and_appending(self):
+        p1 = Package.query.get('pkg1')
+        assert len(p1.licenses_active) == 3
+        assert len(p1.licenses_deleted) == 1
+        p1.licenses_deleted.append(PackageLicense(license=License('e')))
+        assert len(p1.licenses_active) == 3
+        assert len(p1.licenses_deleted) == 2
         session.flush()
         session.clear()
-        p1 = Package.query.get(1)
+        p1 = Package.query.get('pkg1')
         assert len(p1.package_licenses) == 5
-        assert len(p1.active_licenses) == 3
-        assert len(p1.deleted_licenses) == 2
+        assert len(p1.licenses_active) == 3
+        assert len(p1.licenses_deleted) == 2
+        session.clear()
 
-    def test_3(self):
-        p1 = Package.query.get(1)
+    def test_assign_etc(self):
+        p1 = Package.query.get('pkg1')
         p1.licenses = []
         assert len(p1.licenses) == 0 
-        assert len(p1.active_licenses) == 0
-        assert len(p1.deleted_licenses) == 5
+        assert len(p1.licenses_active) == 0
+        assert len(p1.licenses_deleted) == 5
         session.flush()
         session.clear()
 
-        p1 = Package.query.get(1)
+        p1 = Package.query.get('pkg1')
         assert len(p1.licenses) == 0 
         assert len(p1.package_licenses) == 5
-        assert len(p1.deleted_licenses) == 5
+        assert len(p1.licenses_deleted) == 5
+
+# TODO: move this test to base_test (hasslesome because of all the test
+# fixtures)
+class TestStatefulVersionedCollections(object):
+
+    def setup_class(self):
+        pkg2 = Package('pkg2')
+        lic1 = License('a')
+        lic2 = License('b')
+        lic3 = License('c')
+        lic4 = License('d')
+        self.license_list = [ lic1, lic2, lic3, lic4 ]
+        for li in [lic1, lic2, lic3, lic4]:
+            pkg2.licenses3_active.append(PackageLicense(pkg2, li))
+        del pkg2.licenses3_active[3]
+        session.flush()
+        session.clear()
+
+    def test_package_licenses(self):
+        pkg2 = Package.query.get('pkg2')
+        assert len(pkg2.package_licenses) == 4
+        assert pkg2.package_licenses[-1].state == 'deleted'
+
+    def test_licenses3(self):
+        p1 = Package.query.get('pkg2')
+        assert len(p1.licenses3) == 3
+
+    def test_active_deleted_and_appending(self):
+        p1 = Package.query.get('pkg2')
+        assert len(p1.licenses3_active) == 3
+        assert len(p1.licenses3_deleted) == 1
+        p1.licenses3_deleted.append(PackageLicense(license=License('e')))
+        assert len(p1.licenses3_active) == 3
+        assert len(p1.licenses3_deleted) == 2
+        session.flush()
+        session.clear()
+        p1 = Package.query.get('pkg2')
+        assert len(p1.package_licenses) == 5
+        assert len(p1.licenses3_active) == 3
+        assert len(p1.licenses3_deleted) == 2
+        session.clear()
+
+    def test_assign_etc(self):
+        p1 = Package.query.get('pkg2')
+        p1.licenses3 = []
+        assert len(p1.licenses3) == 0 
+        assert len(p1.licenses3_active) == 0
+        assert len(p1.licenses3_deleted) == 5
+        session.flush()
+        session.clear()
+
+        p1 = Package.query.get('pkg2')
+        assert len(p1.licenses3) == 0 
+        assert len(p1.package_licenses) == 5
+        assert len(p1.licenses3_deleted) == 5
 
 
 class TestSimple:
     def test_1(self):
-        pkg1 = Package()
+        pkg1 = Package('pkg3')
         lic1 = License('a')
         lic2 = License('b')
         lic3 = License('c')
@@ -170,6 +229,6 @@ class TestSimple:
         session.clear()
 
     def test_2(self):
-        p1 = Package.query.get(1)
+        p1 = Package.query.get('pkg3')
         assert p1.package_licenses[0].package == p1
 

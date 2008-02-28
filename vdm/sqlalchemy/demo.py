@@ -7,6 +7,8 @@ TODO
     * At very least do we not need to update timestamps?
     * Could have rule that flush ends revision.
 
+1b) support for state of revision (active, deleted (spam), in-progress etc)
+
 2. Test for revision object
 '''
 from datetime import datetime
@@ -78,28 +80,12 @@ metadata.create_all(engine)
 ## Mapped classes
 
         
-
-class State(object):
-
-    def __repr__(self):
-        return '<State %s>' % self.name
-    
-
-class Revision(object):
-    # TODO:? set timestamp in ctor ... (maybe not as good to have undefined
-    # until actual save ...)
-
-    def __repr__(self):
-        return '<Revision %s>' % self.id 
-
 class License(RevisionedObjectMixin):
     def __init__(self, **kwargs):
         for k,v in kwargs.items():
             setattr(self, k, v)
 
 class Package(RevisionedObjectMixin, StatefulObjectMixin):
-    # TODO: complete hack this has got to be set up in some nicer fashion
-    State = State
     def __init__(self, **kwargs):
         for k,v in kwargs.items():
             setattr(self, k, v)
@@ -114,6 +100,11 @@ class Tag(object):
     def __repr__(self):
         return '<Tag %s>' % self.name
 
+class PackageTag(RevisionedObjectMixin, StatefulObjectMixin):
+    def __init__(self, package=None, tag=None, state=None):
+        self.package = package
+        self.tag = tag
+        self.state = state
 
 ## --------------------------------------------------------
 ## Mapper Stuff
@@ -130,8 +121,10 @@ SessionObject = scoped_session(create_session)
 session = SessionObject()
 mapper = SessionObject.mapper
 
-mapper(State, state_table)
-mapper(Revision, revision_table)
+# mapper(State, state_table)
+# mapper(Revision, revision_table)
+State = make_State(mapper, state_table)
+Revision = make_Revision(mapper, revision_table)
 
 mapper(License, license_table, properties={
     },
@@ -140,20 +133,33 @@ mapper(License, license_table, properties={
 
 mapper(Package, package_table, properties={
     'license':relation(License),
-    'tags':relation(Tag, secondary=package_tag_table),
+    # 'tags':relation(Tag, secondary=package_tag_table),
+    'package_tags':relation(PackageTag),
     },
     extension = Revisioner(package_revision_table)
     )
 
 mapper(Tag, tag_table)
 
+mapper(PackageTag, package_tag_table, properties={
+    'package':relation(Package),
+    'tag':relation(Tag),
+    })
+
 modify_base_object_mapper(Package, Revision, State)
 modify_base_object_mapper(License, Revision, State)
+modify_base_object_mapper(PackageTag, Revision, State)
 PackageRevision = create_object_version(mapper, Package,
         package_revision_table)
-
 LicenseRevision = create_object_version(mapper, License,
         license_revision_table)
+PackageTagRevision = create_object_version(mapper, PackageTag,
+        package_tag_revision_table)
+
+from base import add_stateful_versioned_m2m 
+add_stateful_versioned_m2m(Package, PackageTag, 'tags', 'tag', 'package_tags')
+add_stateful_versioned_m2m_on_version(PackageRevision, 'tags')
+
 
 ACTIVE = State(id=1, name='active').name
 DELETED = State(id=2, name='deleted').name
