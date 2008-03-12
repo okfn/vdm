@@ -372,7 +372,7 @@ class Register(object):
         self.type.delete(obj.id)
 
     def list(self):
-        return list(self.type.select())
+        return list(self.type.select(orderBy=self.key_name))
 
     def __iter__(self):
         return self.list().__iter__()
@@ -408,7 +408,7 @@ class VersionedDomainObjectRegister(Register):
             raise Exception(msg)
 
     def list(self, state='active'):
-        all_objs_ever = self.type.select()
+        all_objs_ever = self.type.select(orderBy=self.key_name)
         results = []
         for obj in all_objs_ever:
             obj.set_revision(self.revision, self.transaction)
