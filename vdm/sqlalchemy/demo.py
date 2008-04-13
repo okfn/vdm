@@ -110,19 +110,11 @@ class PackageTag(RevisionedObjectMixin, StatefulObjectMixin):
 ## Mapper Stuff
 
 from sqlalchemy.orm import scoped_session, sessionmaker, create_session
-from sqlalchemy.orm import relation, backref#, secondary
-# SessionObject = scoped_session(sessionmaker(autoflush=True, transactional=True))
-# SessionObject = scoped_session(sessionmaker())
-SessionObject = scoped_session(create_session)
-# WARNING: you must instantiate a session for object_session to work correctly
-# that is for: object_session(some_instance) == session
-# this is essential for our technique of passing around the current revision as
-# an attribute on the session
-session = SessionObject()
-mapper = SessionObject.mapper
+from sqlalchemy.orm import relation, backref
+Session = scoped_session(sessionmaker(autoflush=True, transactional=False))
 
-# mapper(State, state_table)
-# mapper(Revision, revision_table)
+mapper = Session.mapper
+
 State = make_State(mapper, state_table)
 Revision = make_Revision(mapper, revision_table)
 
@@ -160,7 +152,7 @@ from base import add_stateful_versioned_m2m
 add_stateful_versioned_m2m(Package, PackageTag, 'tags', 'tag', 'package_tags')
 add_stateful_versioned_m2m_on_version(PackageRevision, 'tags')
 
-
-ACTIVE = State(id=1, name='active').name
-DELETED = State(id=2, name='deleted').name
+# need to set up the basic states for all Stateful stuff to work
+import base
+ACTIVE, DELETED = base.make_states(Session())
 

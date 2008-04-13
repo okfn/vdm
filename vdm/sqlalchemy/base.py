@@ -9,6 +9,8 @@ Current restrictions:
 
 # make explicit to avoid errors from typos (no attribute defns in python!)
 def set_revision(session, revision):
+    # TODO: check if we are being given the Session class (threadlocal case)
+    # if so set on both class and instance
     session.revision = revision
 
 def get_revision(session):
@@ -95,6 +97,12 @@ def make_State(mapper, state_table):
     mapper(State, state_table)
     return State
 
+def make_states(session):
+    ACTIVE = State(id=1, name='active').name
+    DELETED = State(id=2, name='deleted').name
+    session.flush()
+    return ACTIVE, DELETED
+
 class Revision(object):
     # TODO:? set timestamp in ctor ... (maybe not as good to have undefined
     # until actual save ...)
@@ -115,7 +123,8 @@ class StatefulObjectMixin(object):
     def delete(self):
         # HACK: how do we get the real value without having State object
         # available ...
-        deleted = self.state_obj.query.get(2)
+        print 'RUNNING delete'
+        deleted = self.state_obj.query.filter_by(name='deleted').one()
         self.state = deleted
     
     def undelete(self):
@@ -218,7 +227,10 @@ def create_object_version(mapper_fn, base_object, rev_table):
     for prop in base_mapper.iterate_properties:
         is_relation = prop.__class__ == sqlalchemy.orm.properties.PropertyLoader
         if is_relation:
-            prop_remote_obj = prop.select_mapper.class_
+            # in sqlachemy 0.4.2
+            # prop_remote_obj = prop.select_mapper.class_
+            # in 0.4.5
+            prop_remote_obj = prop.argument
             remote_obj_is_revisioned = getattr(prop_remote_obj, '__revisioned__', False)
             # this is crude, probably need something better
             is_m2m = (prop.secondary != None or prop.uselist)
@@ -307,7 +319,29 @@ class Revisioner(MapperExtension):
         instance.revision = current_rev
         # also set this so that we flush
 
-    def make_revision(self, instance):
+    def check_real_change(self, instance, mapper):
+        table = mapper.tables[0]
+        colname = 'id'
+        ctycol = instance.c[colname]
+        ctyval = getattr(instance, colname)
+        values = table.select(ctycol==ctyval).execute().fetchone() 
+
+        # SA might've flagged this for an update even though it didn't change.
+        # This occurs when a relation is updated, thus marking this instance
+        # for a save/update operation. We check here against the last version
+        # to ensure we really should save this version and update the version
+        # data.
+        for key in instance.c.keys():
+            if getattr(instance, key) != values[key]:
+                # the instance was really updated, so we create a new version
+                return True
+        return False
+
+    def make_revision(self, instance, mapper):
+        # TODO: use this (and test it)
+        # if not self.check_real_change(instance, mapper):
+        #    return # early out
+
         # NO GOOD working with the object as that only gets committed at next
         # flush. Need to work with the table directly (could this be dangerous)
         colvalues = {}
@@ -319,6 +353,7 @@ class Revisioner(MapperExtension):
         assert instance.revision.id
         colvalues['revision_id'] = instance.revision.id
         colvalues['continuity_id'] = instance.id
+
         self.revision_table.insert().execute(colvalues)
         # set to None to avoid accidental reuse
         # ERROR: cannot do this as after_* is called per object and may be run
@@ -335,11 +370,11 @@ class Revisioner(MapperExtension):
         return EXT_CONTINUE
 
     def after_update(self, mapper, connection, instance):
-        self.make_revision(instance)
+        self.make_revision(instance, mapper)
         return EXT_CONTINUE
 
     def after_insert(self, mapper, connection, instance):
-        self.make_revision(instance)
+        self.make_revision(instance, mapper)
         return EXT_CONTINUE
 
 
