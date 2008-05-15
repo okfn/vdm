@@ -1,16 +1,20 @@
-## About
+About
+=====
 
 A versioned domain model framework.
 
-The vdm package allows you to 'version' your domain model objects in the same
+The vdm package allows you to 'version' your domain model in the same
 way that source code version control systems such as subversion help you
-version your code. At present the package is built as a simple extension on top
-of SQLObject so that those already familiar with SQLObject for creating domain
- models will find it easy to use the versioning facilities provided by this
- library.
+version your code. In particular, versioned domain model versions a complete
+model and not just individual domain objects (for more on this distinction see
+below).
+
+At present the package is provided as an extension to SQLObject and to
+SQLAlchemy (with an extension to Elixir in progress).
 
 
-## Copyright and License
+Copyright and License
+=====================
 
 (c) 2007-2008 The Open Knowledge Foundation
 
@@ -19,12 +23,14 @@ Licensed under the MIT license:
   <http://www.opensource.org/licenses/mit-license.php>
 
 
-## Authors
+Authors
+=======
 
 Rufus Pollock <rufus [at] rufuspollock [dot] org>
 
 
-## Conceptual Documentation
+Conceptual Documentation
+========================
 
 A great starting point is Fowler's *Patters for things that change with time*:
 
@@ -34,7 +40,7 @@ In particular Temporal Object:
 
   http://www.martinfowler.com/ap2/temporalObject.html
 
-We implement two approaches:
+Two possible approaches:
 
   1. (simpler) Versioned domain objects are versioned independently (like a
      wiki). This is less of a versioned 'domain model' and more of plain
@@ -49,37 +55,83 @@ Remark: using the first approach it is:
     domain objects.
   * It is impossible to change multiple objects 'at once' -- that is as part of
     one atomic change
+  * More discussions of limitations can be found in this thread [1] as well as
+    in vdm/elixir/README.txt.
 
-### Full Versioned Domain Model
+[1]:<http://groups.google.com/group/sqlelixir/browse_thread/thread/50aee902ce3555fb/>
 
-With 'Revisions' we can support changing multiple objects at once. This gives
-us something very similar to the subversion object model (as encapsulated in
-their python bindings) but with a filesystem replaced by a domain model.
+We implement the second case (which obviously includes the first one as a
+subcase) -- hence the name of this package.
 
-As we need to make some distinction betwen the 'domain model' -- that is the
-objects we want to model -- and the extra apparatus we need to make this
-versioned we use the term Repository as the overarching object that holds
-references to all objects and nest the domain model within that:
+Full Versioned Domain Model
+---------------------------
 
-# everything in our 
-Repository
-    # 'helper' objects
-    Revision
-    State
-    # domain model objects
-    ...
+To encapsulate changing multiple objects at once as well as to facilitate
+domain object traversal it is necessary to introduce an explicit 'Revision'
+object to represent a single changeset to the domain model.
 
-repo = Repository()
-rev = repo.new_revision()
-# change some domain objects
-rev.commit()
+One also needs to introduce the concept of 'State'. This allows us to make
+(some) domain objects stateful, in particular those which are to be versioned
+(State is necessary to support delete/undelete functionality as well as to
+implement versioned many-to-many relationships.
 
-### Code in Action
+For each original domain object that comes versioned we end up with 2 domain objects:
 
-To see the (sqlobject) code in action take a look at:
+  * The 'continuity': the original domain object.
+  * The 'version/revision' of that domain object.
 
-  ./vdm/sqlobject/demo_test.py
+Often a user will never need to be concerned (explicitly) with the version/revision object as they will just interact with the original domain object, which will, where necessary, 'proxy' requests down to the 'version/revision'.
+
+To give a flavour of all of this here is a pseudo-code example::
+
+    # we need a session of some kind to track which objects have been changed
+    # each session then has a single revision
+    rev1 = Revision(author='me')
+    session.revision = rev1
+    # Book and Author are domain objects which has been made versioned using this library
+    # typo!
+    b1 = Book(name='warandpeace', title='War and Peacee')
+    b2 = Book(name='annakarenina', title='Anna')
+    b3 = Book(name='warandpeace')
+    a1 = Author(name='tolstoy')
+    # this is just shorthand for ending this revision and saving all changes
+    # this may vary depending on the implementation
+    rev1.commit()
+    timestamp1 = rev1.timestamp
+
+    # some time later
+
+    rev2 = Revision(author='me')
+    session.revision = rev2
+    b1 = Book.get(name='warandpeace')
+    # correct typo
+    b1.title = 'War and Peace'
+    # add the author
+    a1 = Author.get(name='tolstoy')
+    b1.authors.append(a1)
+    # duplicate item so delete
+    b3.delete()
+    rev2.commit()
+
+    # some time even later
+    rev1 = Revision.get(timestamp=timestamp1)
+    b1 = Book.get(name='warandpeace') 
+    b1 = b1.get_as_of(rev1)
+    assert b1.title == 'War and Peacee'
+    assert b1.authors == []
+    # etc
+
+
+Code in Action
+--------------
+
+To see some real code in action take a look at::
+
   ./vdm/sqlobject/demo.py
+  ./vdm/sqlobject/demo_test.py
+
+  ./vdm/sqlalchemy/demo.py
+  ./vdm/sqlalchemy/demo_test.py
 
 The code for elixir, which is not yet fully functional, can be found in:
 
