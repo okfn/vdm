@@ -5,6 +5,8 @@ Current restrictions:
     * No support for composite primary keys.
 
 '''
+import logging
+logger = logging.getLogger('vdm')
 
 
 # make explicit to avoid errors from typos (no attribute defns in python!)
@@ -172,6 +174,7 @@ class RevisionedObjectMixin(object):
             self._set_revision(revision)
         else:
             revision = self._get_revision()
+        print 'Revision is: %s' % revision
         # if revision is None or does not have an id (implies in transaction)
         # then we should use head (i.e. continuity object since this caches
         # head)
@@ -209,7 +212,9 @@ def create_object_version(mapper_fn, base_object, rev_table):
     
     NB: This better get called after mapping has happened to base_object
     '''
-    class MyClass(object):
+    # TODO: can we always assume all versioned objects are stateful?
+    # If not need to do an explicit check
+    class MyClass(StatefulObjectMixin):
         pass
     name = base_object.__name__ + 'Revision'
     MyClass.__name__ = name
@@ -320,11 +325,16 @@ class Revisioner(MapperExtension):
         # also set this so that we flush
 
     def check_real_change(self, instance, mapper):
+        logger.debug('check_real_change: %s' % instance)
         table = mapper.tables[0]
         colname = 'id'
         ctycol = instance.c[colname]
         ctyval = getattr(instance, colname)
         values = table.select(ctycol==ctyval).execute().fetchone() 
+        if values is None: # object not yet created
+            logging.debug('check_real_change: True')
+            return True
+        ignored = [ 'revision_id' ]
 
         # SA might've flagged this for an update even though it didn't change.
         # This occurs when a relation is updated, thus marking this instance
@@ -332,16 +342,17 @@ class Revisioner(MapperExtension):
         # to ensure we really should save this version and update the version
         # data.
         for key in instance.c.keys():
+            if key in ignored:
+                continue
+            # logger.debug('%s, %s, %s' % (key, getattr(instance, key), values[key]))
             if getattr(instance, key) != values[key]:
                 # the instance was really updated, so we create a new version
+                logging.debug('check_real_change: True')
                 return True
+        logging.debug('check_real_change: False')
         return False
 
     def make_revision(self, instance, mapper):
-        # TODO: use this (and test it)
-        # if not self.check_real_change(instance, mapper):
-        #    return # early out
-
         # NO GOOD working with the object as that only gets committed at next
         # flush. Need to work with the table directly (could this be dangerous)
         colvalues = {}
@@ -353,7 +364,8 @@ class Revisioner(MapperExtension):
         assert instance.revision.id
         colvalues['revision_id'] = instance.revision.id
         colvalues['continuity_id'] = instance.id
-
+        
+        logging.debug('Creating version of %s: %s' % (instance, colvalues))
         self.revision_table.insert().execute(colvalues)
         # set to None to avoid accidental reuse
         # ERROR: cannot do this as after_* is called per object and may be run
@@ -362,20 +374,36 @@ class Revisioner(MapperExtension):
         # object_session(instance).revision = None
 
     def before_update(self, mapper, connection, instance):
+        logger.debug('before_update: %s' % instance)
         self.set_revision(instance)
+        self._is_changed = self.check_real_change(instance, mapper)
         return EXT_CONTINUE
 
     def before_insert(self, mapper, connection, instance):
+        logger.debug('before_insert: %s' % instance)
+        # TODO: explain why we cannot do everything here
+        # i.e. why do we need to run stuff in after_update
         self.set_revision(instance)
+        self._is_changed = self.check_real_change(instance, mapper)
         return EXT_CONTINUE
 
     def after_update(self, mapper, connection, instance):
-        self.make_revision(instance, mapper)
+        logger.debug('after_update: %s' % instance)
+        if self._is_changed:
+            self.make_revision(instance, mapper)
         return EXT_CONTINUE
 
     def after_insert(self, mapper, connection, instance):
-        self.make_revision(instance, mapper)
+        logger.debug('after_insert: %s' % instance)
+        if self._is_changed:
+            self.make_revision(instance, mapper)
         return EXT_CONTINUE
+
+    def append_result(self, mapper, selectcontext, row, instance, result,
+             **flags):
+        logger.debug('append_result: %s' % instance)
+        return EXT_CONTINUE
+
 
 
 # TODO: __all__ = [ ... ]

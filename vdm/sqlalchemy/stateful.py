@@ -1,3 +1,8 @@
+'''Support for stateful lists.
+
+TODO: create some proper tests for base_modifier stuff.
+TODO:move stateful material from base.py here?
+'''
 import itertools
 class StatefulList(object):
 
@@ -22,7 +27,9 @@ class StatefulList(object):
         for argname in extra_args:
             setattr(self, argname, kwargs.get(argname, None))
         if self.is_active is None:
-            self.is_active = lambda x: x.is_active()
+            # object may not exist (e.g. with get_as_of0 in which case it will
+            # be None
+            self.is_active = lambda x: not(x is None) and x.is_active()
         if self.delete is None:
             self.delete = lambda x: x.delete()
         if self.undelete is None:
@@ -127,8 +134,9 @@ class StatefulList(object):
     #        self[ii] = values[ii-start]
 
     def __iter__(self):
-        myiter = itertools.ifilter(self._is_active,
-                iter(self.baselist))
+        # TODO: maybe base_modifier should be folded into the operators ...
+        mytest = lambda x: self._is_active(self.base_modifier(x))
+        myiter = itertools.ifilter(mytest, iter(self.baselist))
         return myiter
     
     def __len__(self):

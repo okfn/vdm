@@ -2,6 +2,10 @@ from sqlalchemy.orm import object_session
 
 from demo import *
 
+import logging
+# logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger('vdm')
+
 
 class TestVersioning:
 
@@ -10,8 +14,9 @@ class TestVersioning:
         Session.remove()
     
     def setup_class(self):
-        rev1 = Revision() 
+        logger.debug('===== STARTING REV 1')
         session = Session()
+        rev1 = Revision() 
         set_revision(session, rev1)
 
         self.name1 = 'anna'
@@ -21,17 +26,19 @@ class TestVersioning:
         lic1 = License(name='blah', open=True)
         p1 = Package(name=self.name1, title=self.title1, license=lic1)
         p2 = Package(name=self.name2, title=self.title1, license=lic1)
-        t1 = Tag(name='geo')
-        # p1.tags.append(t1)
+        # t1 = Tag(name='geo')
+        # p1.tags = [t1]
 
-        session.flush()
-        # assert rev1.id
-        # assert p1.revision == rev1
+        logger.debug('***** Committing/Flushing Rev 1')
+        session.commit()
         # can only get it after the flush
         self.rev1_id = rev1.id
         Session.clear()
+        Session.remove()
 
+        logger.debug('===== STARTING REV 2')
         session = Session()
+        session.begin()
         rev2 = Revision()
         set_revision(session, rev2)
         outlic1 = License.query.filter_by(name='blah').first()
@@ -39,9 +46,12 @@ class TestVersioning:
         outp1 = Package.query.filter_by(name=self.name1).one()
         outp2 = Package.query.filter_by(name=self.name2).one()
         outp1.title = self.title2
-        outp1.tags = []
+        # outp1.tags = []
+        t1 = Tag(name='geo')
+        outp1.tags = [t1]
         outp2.delete()
-        session.flush()
+        # session.flush()
+        session.commit()
         # must do this after flush as timestamp not set until then
         self.ts2 = rev2.timestamp
         Session.clear()
@@ -62,7 +72,8 @@ class TestVersioning:
         p1 = Package.query.filter_by(name=self.name1).one()
         assert p1.license.open == False
         assert p1.revision.timestamp == self.ts2
-        assert p1.tags == []
+        # assert p1.tags == []
+        assert len(p1.tags) == 1
 
     def test_basic_continuity(self):
         p1 = Package.query.filter_by(name=self.name1).one()
@@ -103,10 +114,19 @@ class TestVersioning:
         p1r1 = p1.get_as_of(rev1)
         assert p1r1.license.open == True
 
+    def test_versioning_m2m_1(self):
+        p1 = Package.query.filter_by(name=self.name1).one()
+        rev1 = Revision.query.get(self.rev1_id)
+        ptag = p1.package_tags[0]
+        # does not exist
+        assert ptag.get_as_of(rev1) == None
+
     def test_versioning_m2m(self):
         p1 = Package.query.filter_by(name=self.name1).one()
         rev1 = Revision.query.get(self.rev1_id)
         p1r1 = p1.get_as_of(rev1)
+        assert len(p1.tags_active) == 0
+        assert len(p1.tags_deleted) == 1
+        assert len(p1.tags) == 0
         assert len(p1r1.tags) == 0
-        # TODO: more testing of the m2m relation ...
-
+       

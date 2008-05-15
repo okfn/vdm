@@ -12,6 +12,8 @@ TODO
 2. Test for revision object
 '''
 from datetime import datetime
+import logging
+logger = logging.getLogger('vdm')
 
 from sqlalchemy import *
 # from sqlalchemy import create_engine
@@ -33,6 +35,7 @@ revision_table = Table('revision', metadata,
         Column('id', Integer, primary_key=True),
         Column('timestamp', DateTime, default=datetime.now),
         Column('author', String(200)),
+        Column('message', Text),
         )
 
 ## Demo tables
@@ -101,17 +104,21 @@ class Tag(object):
         return '<Tag %s>' % self.name
 
 class PackageTag(RevisionedObjectMixin, StatefulObjectMixin):
-    def __init__(self, package=None, tag=None, state=None):
+    def __init__(self, package=None, tag=None, state=None, **kwargs):
         self.package = package
         self.tag = tag
         self.state = state
+        for k,v in kwargs.items():
+            setattr(self, k, v)
 
 ## --------------------------------------------------------
 ## Mapper Stuff
 
 from sqlalchemy.orm import scoped_session, sessionmaker, create_session
 from sqlalchemy.orm import relation, backref
-Session = scoped_session(sessionmaker(autoflush=True, transactional=False))
+# this works but other options do not ...
+# Session = scoped_session(sessionmaker(autoflush=False, transactional=True))
+Session = scoped_session(sessionmaker(autoflush=True, transactional=True))
 
 mapper = Session.mapper
 
@@ -136,7 +143,9 @@ mapper(Tag, tag_table)
 mapper(PackageTag, package_tag_table, properties={
     'package':relation(Package),
     'tag':relation(Tag),
-    })
+    },
+    extension = Revisioner(package_tag_revision_table)
+    )
 
 modify_base_object_mapper(Package, Revision, State)
 modify_base_object_mapper(License, Revision, State)
