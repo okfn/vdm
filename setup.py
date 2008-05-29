@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 from vdm import __version__
 from vdm import __description__
-from vdm import __long_description__
+from vdm import __doc__ as __long_description__
 
 setup(
     name = 'vdm',
@@ -18,8 +18,9 @@ setup(
     long_description = __long_description__,
     license = "MIT",
     keywords = "versioning sqlobject sqlachemy",
-    url = "http://knowledgeforge.net/ckan/svn/vdm/", 
+    url = "http://knowledgeforge.net/ckan/svn/vdm/trunk/README.txt", 
     download_url = "http://knowledgeforge.net/ckan/svn/vdm/trunk",
+    zip_safe = False,
     classifiers = [
         'Development Status :: 3 - Alpha',
         'Environment :: Console',

@@ -1,0 +1,10 @@
+## v0.2: 2008-05 
+
+  * SQLAlchemy implementation of versioned domain model.
+  * Partial Elixir implementation.
+  * Various (minor) bugfixes and improvments for SQLObject version
+  * Improve documentation.
+
+## v0.1: 2008-04
+
+  * Fully functional SQLObject implementation of versioned domain.
