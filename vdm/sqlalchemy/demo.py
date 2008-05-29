@@ -10,7 +10,7 @@ logger = logging.getLogger('vdm')
 from sqlalchemy import *
 # from sqlalchemy import create_engine
 
-from vdm.sqlalchemy.base import *
+import vdm.sqlalchemy
 
 engine = create_engine('sqlite:///:memory:',
         # echo=True
@@ -19,8 +19,8 @@ metadata = MetaData(bind=engine)
 
 ## VDM-specific tables
 
-state_table = make_state_table(metadata)
-revision_table = make_revision_table(metadata)
+state_table = vdm.sqlalchemy.make_state_table(metadata)
+revision_table = vdm.sqlalchemy.make_revision_table(metadata)
 
 ## Demo tables
 
@@ -49,15 +49,15 @@ package_tag_table = Table('package_tag', metadata,
         )
 
 
-make_table_stateful(license_table)
-make_table_stateful(package_table)
-make_table_stateful(tag_table)
-make_table_stateful(package_tag_table)
-license_revision_table = make_table_revisioned(license_table)
-package_revision_table = make_table_revisioned(package_table)
-tag_revision_table = make_table_revisioned(tag_table)
+vdm.sqlalchemy.make_table_stateful(license_table)
+vdm.sqlalchemy.make_table_stateful(package_table)
+vdm.sqlalchemy.make_table_stateful(tag_table)
+vdm.sqlalchemy.make_table_stateful(package_tag_table)
+license_revision_table = vdm.sqlalchemy.make_table_revisioned(license_table)
+package_revision_table = vdm.sqlalchemy.make_table_revisioned(package_table)
+tag_revision_table = vdm.sqlalchemy.make_table_revisioned(tag_table)
 # TODO: this has a composite primary key ...
-package_tag_revision_table = make_table_revisioned(package_tag_table)
+package_tag_revision_table = vdm.sqlalchemy.make_table_revisioned(package_tag_table)
 
 
 metadata.create_all(engine) 
@@ -67,12 +67,13 @@ metadata.create_all(engine)
 ## Mapped classes
 
         
-class License(RevisionedObjectMixin):
+class License(vdm.sqlalchemy.RevisionedObjectMixin):
     def __init__(self, **kwargs):
         for k,v in kwargs.items():
             setattr(self, k, v)
 
-class Package(RevisionedObjectMixin, StatefulObjectMixin):
+class Package(vdm.sqlalchemy.RevisionedObjectMixin,
+        vdm.sqlalchemy.StatefulObjectMixin):
     def __init__(self, **kwargs):
         for k,v in kwargs.items():
             setattr(self, k, v)
@@ -87,7 +88,8 @@ class Tag(object):
     def __repr__(self):
         return '<Tag %s>' % self.name
 
-class PackageTag(RevisionedObjectMixin, StatefulObjectMixin):
+class PackageTag(vdm.sqlalchemy.RevisionedObjectMixin,
+        vdm.sqlalchemy.StatefulObjectMixin):
     def __init__(self, package=None, tag=None, state=None, **kwargs):
         logger.debug('PackageTag.__init__: %s, %s' % (package, tag))
         self.package = package
@@ -113,12 +115,12 @@ Session = scoped_session(sessionmaker(autoflush=True, transactional=True))
 mapper = Session.mapper
 
 # VDM-specific domain objects
-State = make_State(mapper, state_table)
-Revision = make_Revision(mapper, revision_table)
+State = vdm.sqlalchemy.make_State(mapper, state_table)
+Revision = vdm.sqlalchemy.make_Revision(mapper, revision_table)
 
 mapper(License, license_table, properties={
     },
-    extension=Revisioner(license_revision_table)
+    extension=vdm.sqlalchemy.Revisioner(license_revision_table)
     )
 
 mapper(Package, package_table, properties={
@@ -135,7 +137,7 @@ mapper(Package, package_table, properties={
     # <http://www.sqlalchemy.org/trac/browser/sqlalchemy/trunk/examples/association/proxied_association.py>
     'package_tags':relation(PackageTag, cascade='all'), #, delete-orphan'),
     },
-    extension = Revisioner(package_revision_table)
+    extension = vdm.sqlalchemy.Revisioner(package_revision_table)
     )
 
 mapper(Tag, tag_table)
@@ -144,24 +146,24 @@ mapper(PackageTag, package_tag_table, properties={
     'package':relation(Package),
     'tag':relation(Tag),
     },
-    extension = Revisioner(package_tag_revision_table)
+    extension = vdm.sqlalchemy.Revisioner(package_tag_revision_table)
     )
 
-modify_base_object_mapper(Package, Revision, State)
-modify_base_object_mapper(License, Revision, State)
-modify_base_object_mapper(PackageTag, Revision, State)
-PackageRevision = create_object_version(mapper, Package,
+vdm.sqlalchemy.modify_base_object_mapper(Package, Revision, State)
+vdm.sqlalchemy.modify_base_object_mapper(License, Revision, State)
+vdm.sqlalchemy.modify_base_object_mapper(PackageTag, Revision, State)
+PackageRevision = vdm.sqlalchemy.create_object_version(mapper, Package,
         package_revision_table)
-LicenseRevision = create_object_version(mapper, License,
+LicenseRevision = vdm.sqlalchemy.create_object_version(mapper, License,
         license_revision_table)
-PackageTagRevision = create_object_version(mapper, PackageTag,
+PackageTagRevision = vdm.sqlalchemy.create_object_version(mapper, PackageTag,
         package_tag_revision_table)
 
 from base import add_stateful_versioned_m2m 
-add_stateful_versioned_m2m(Package, PackageTag, 'tags', 'tag', 'package_tags')
-add_stateful_versioned_m2m_on_version(PackageRevision, 'tags')
+vdm.sqlalchemy.add_stateful_versioned_m2m(Package, PackageTag, 'tags', 'tag',
+        'package_tags')
+vdm.sqlalchemy.add_stateful_versioned_m2m_on_version(PackageRevision, 'tags')
 
 # need to set up the basic states for all Stateful stuff to work
-import base
-ACTIVE, DELETED = base.make_states(Session())
+ACTIVE, DELETED = vdm.sqlalchemy.make_states(Session())
 

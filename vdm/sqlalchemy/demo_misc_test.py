@@ -1,6 +1,7 @@
 from sqlalchemy.orm import object_session
 
 from demo import *
+from base import *
 
 class TestMisc:
 

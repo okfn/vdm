@@ -1,23 +1,7 @@
-'''Versioned Domain Model for SQLAlchemy.
-
-Current restrictions:
-
-    * No support for composite primary keys.
-
-TODO
-====
-
-1. How do we commit revisions (do we need to).
-    * At very least do we not need to update timestamps?
-    * Could have rule that flush ends revision.
-
-1b. support for state of revision (active, deleted (spam), in-progress etc)
-'''
 from datetime import datetime
 
 import logging
 logger = logging.getLogger('vdm')
-
 
 # make explicit to avoid errors from typos (no attribute defns in python!)
 def set_revision(session, revision):
@@ -462,4 +446,3 @@ class Revisioner(MapperExtension):
 
 
 
-# TODO: __all__ = [ ... ]

@@ -1,5 +1,6 @@
 from sqlalchemy.orm import object_session
 
+import vdm.sqlalchemy
 from demo import *
 
 import logging
@@ -14,7 +15,7 @@ class TestVersioning:
         logger.debug('===== STARTING REV 1')
         session = Session()
         rev1 = Revision() 
-        set_revision(session, rev1)
+        vdm.sqlalchemy.set_revision(session, rev1)
 
         self.name1 = 'anna'
         self.name2 = 'warandpeace'
@@ -37,7 +38,7 @@ class TestVersioning:
         session = Session()
         session.begin()
         rev2 = Revision()
-        set_revision(session, rev2)
+        vdm.sqlalchemy.set_revision(session, rev2)
         outlic1 = License.query.filter_by(name='blah').first()
         outlic1.open = False
         outp1 = Package.query.filter_by(name=self.name1).one()
