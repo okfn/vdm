@@ -9,7 +9,6 @@ setup(
     version = __version__,
     packages = find_packages(),
     install_requires = [ ],
-    scripts = [],
 
     # metadata for upload to PyPI
     author = "Rufus Pollock (Open Knowledge Foundation)",
@@ -17,7 +16,7 @@ setup(
     description = __description__,
     long_description = __long_description__,
     license = "MIT",
-    keywords = "versioning sqlobject sqlachemy",
+    keywords = "versioning sqlobject sqlalchemy orm",
     url = "http://knowledgeforge.net/ckan/svn/vdm/trunk/README.txt", 
     download_url = "http://knowledgeforge.net/ckan/svn/vdm/trunk",
     zip_safe = False,
