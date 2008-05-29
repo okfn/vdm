@@ -1,9 +1,14 @@
 '''Support for stateful lists.
 
 TODO: create some proper tests for base_modifier stuff.
-TODO:move stateful material from base.py here?
+TODO: move stateful material from base.py here?
 '''
+import logging
+logger = logging.getLogger('vdm')
+
 import itertools
+
+
 class StatefulList(object):
 
     def __init__(self, target_list, **kwargs):
@@ -109,8 +114,6 @@ class StatefulList(object):
                 stop = index.stop
             step = index.step or 1
 
-            print index.start
-            print stop, step
             rng = range(index.start or 0, stop, step)
             if step == 1:
                 for ii in rng:
@@ -225,35 +228,43 @@ class OurAssociationProxy(sqlalchemy.ext.associationproxy.AssociationProxy):
 
 def add_stateful_m2m(object_to_alter, m2m_object, m2m_property_name,
         attr, basic_m2m_name, **kwargs):
-    '''Attach active and deleted stateful properties and a basic assocition
-    proxy based on a relation pointing to a simple m2m objec.
+    '''Attach active and deleted stateful lists along with the association
+    proxy based on the active list to original object (object_to_alter).
 
-    To illustrate if one has:
+    To illustrate if one has::
 
-    class Package(object):
+        class Package(object):
 
-        # package_licenses come from a simple relation pointing to
-        # PackageLicense and returns PackageLicense objects (so do *not* use
-        # secondary keyword)
-        # Thus it will usually not be defined here but in the mapper
-        
-        # package_licenses
+            # package_licenses is the basic_m2m_name attribute
+            # 
+            # it should come from a simple relation pointing to PackageLicense
+            # and returns PackageLicense objects (so do *not* use secondary
+            # keyword)
+            #
+            # It will usually not be defined here but in the Package mapper:
+            #
+            # 'package_licenses':relation(License) ...
+            
+            package_licenses = ... from_mapper ...
 
-    Then after running:
+    Then after running::
+
         add_stateful_m2m(Package, PackageLicense, 'licenses', 'license',
         'package_licenses')
     
-    there will be additional properites:
+    there will be additional properties:
 
         licenses_active
         licenses_deleted
         licenses
 
-    **kwargs: these are passed on to the StatefulListProperty.
+    @arg attr: the name of the attribute on the Join object corresponding to
+        the target (e.g. in this case 'license' on PackageLicense).
+    @arg **kwargs: these are passed on to the StatefulListProperty.
     '''
 
-    def create_m2m(foreign):
-        mykwargs = {}
+    def create_m2m(foreign, **kw):
+        mykwargs = dict(kw)
         mykwargs[attr] = foreign
         return m2m_object(**mykwargs)
 

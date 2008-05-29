@@ -1,10 +1,20 @@
-'''Versioned Domain Model for sqlalchemy.
+'''Versioned Domain Model for SQLAlchemy.
 
 Current restrictions:
 
     * No support for composite primary keys.
 
+TODO
+====
+
+1. How do we commit revisions (do we need to).
+    * At very least do we not need to update timestamps?
+    * Could have rule that flush ends revision.
+
+1b. support for state of revision (active, deleted (spam), in-progress etc)
 '''
+from datetime import datetime
+
 import logging
 logger = logging.getLogger('vdm')
 
@@ -20,11 +30,58 @@ def get_revision(session):
     return session.revision
 
 ## --------------------------------------------------------
+## VDM-Specific Domain Objects and Tables
+
+
+def make_state_table(metadata):
+    state_table = Table('state', metadata,
+            Column('id', Integer, primary_key=True),
+            Column('name', String(8))
+            )
+    return state_table
+
+def make_revision_table(metadata):
+    revision_table = Table('revision', metadata,
+            Column('id', Integer, primary_key=True),
+            Column('timestamp', DateTime, default=datetime.now),
+            Column('author', String(200)),
+            Column('message', Text),
+            )
+    return revision_table
+
+class State(object):
+
+    def __repr__(self):
+        return '<State %s>' % self.name
+
+def make_State(mapper, state_table):
+    mapper(State, state_table)
+    return State
+
+def make_states(session):
+    ACTIVE = State(id=1, name='active').name
+    DELETED = State(id=2, name='deleted').name
+    session.commit()
+    return ACTIVE, DELETED
+
+class Revision(object):
+    # TODO:? set timestamp in ctor ... (maybe not as good to have undefined
+    # until actual save ...)
+
+    def __repr__(self):
+        return '<Revision %s>' % self.id 
+
+def make_Revision(mapper, revision_table):
+    mapper(Revision, revision_table)
+    return Revision
+
+## --------------------------------------------------------
 ## Table Helpers
 
 from sqlalchemy import *
 
-def make_stateful(base_table):
+def make_table_stateful(base_table):
+    '''Make a table 'stateful' by adding appropriate state column.'''
     base_table.append_column(
             # TODO: should probably not use default but should set on object
             # using StatefulObjectMixin 
@@ -66,7 +123,7 @@ def copy_table(table, newtable):
     for key in table.c.keys():
         copy_column(key, table, newtable)
 
-def make_revision_table(base_table):
+def make_table_revisioned(base_table):
     base_table.append_column(
             Column('revision_id', Integer, ForeignKey('revision.id'))
             )
@@ -90,32 +147,6 @@ def make_revision_table(base_table):
 ## --------------------------------------------------------
 ## Object Helpers
 
-class State(object):
-
-    def __repr__(self):
-        return '<State %s>' % self.name
-
-def make_State(mapper, state_table):
-    mapper(State, state_table)
-    return State
-
-def make_states(session):
-    ACTIVE = State(id=1, name='active').name
-    DELETED = State(id=2, name='deleted').name
-    session.flush()
-    return ACTIVE, DELETED
-
-class Revision(object):
-    # TODO:? set timestamp in ctor ... (maybe not as good to have undefined
-    # until actual save ...)
-
-    def __repr__(self):
-        return '<Revision %s>' % self.id 
-
-def make_Revision(mapper, revision_table):
-    mapper(Revision, revision_table)
-    return Revision
-
 class StatefulObjectMixin(object):
 
     __stateful__ = True
@@ -125,7 +156,7 @@ class StatefulObjectMixin(object):
     def delete(self):
         # HACK: how do we get the real value without having State object
         # available ...
-        print 'RUNNING delete'
+        logger.debug('RUNNING delete on %s' % self)
         deleted = self.state_obj.query.filter_by(name='deleted').one()
         self.state = deleted
     
@@ -174,7 +205,6 @@ class RevisionedObjectMixin(object):
             self._set_revision(revision)
         else:
             revision = self._get_revision()
-        print 'Revision is: %s' % revision
         # if revision is None or does not have an id (implies in transaction)
         # then we should use head (i.e. continuity object since this caches
         # head)
@@ -208,9 +238,15 @@ def modify_base_object_mapper(base_object, revision_obj, state_obj):
     base_mapper.add_property('state', relation(state_obj))
 
 def create_object_version(mapper_fn, base_object, rev_table):
-    '''
+    '''Create the Version Domain Object corresponding to base_object.
+
+    E.g. if Package is our original object we should do::
     
-    NB: This better get called after mapping has happened to base_object
+        # name of Version Domain Object class 
+        PackageVersion = create_object_version(..., Package, ...)
+    
+    NB: This must obviously be called after mapping has happened to
+    base_object.
     '''
     # TODO: can we always assume all versioned objects are stateful?
     # If not need to do an explicit check
@@ -218,16 +254,21 @@ def create_object_version(mapper_fn, base_object, rev_table):
         pass
     name = base_object.__name__ + 'Revision'
     MyClass.__name__ = name
-    MyClass.__base_class__ = base_object
-    # TODO: add revision relation here (rather than explicitly below)
+    MyClass.__continuity_class__ = base_object
+
+    # Must add this so base object can retrieve revisions ...
     base_object.__revision_class__ = MyClass
 
     ourmapper = mapper_fn(MyClass, rev_table, properties={
+        # NB: call it all_revisions rather than just revisions because it will
+        # yield all revisions not just those less than the current revision
+        # 'continuity':relation(base_object, backref=backref('all_revisions',
+        #    cascade='all, delete-orphan')),
         'continuity':relation(base_object),
         })
     base_mapper = class_mapper(base_object)
     # add in 'relationship' stuff from continuity onto revisioned obj
-    # If related object is revisioned ok
+    # If related object is revisioned then ok
     # If not can support simple relation but nothing else
     for prop in base_mapper.iterate_properties:
         is_relation = prop.__class__ == sqlalchemy.orm.properties.PropertyLoader
@@ -336,6 +377,7 @@ class Revisioner(MapperExtension):
             return True
         ignored = [ 'revision_id' ]
 
+        # (Based on Elixir's solution to this problem)
         # SA might've flagged this for an update even though it didn't change.
         # This occurs when a relation is updated, thus marking this instance
         # for a save/update operation. We check here against the last version
@@ -364,9 +406,23 @@ class Revisioner(MapperExtension):
         assert instance.revision.id
         colvalues['revision_id'] = instance.revision.id
         colvalues['continuity_id'] = instance.id
-        
-        logging.debug('Creating version of %s: %s' % (instance, colvalues))
-        self.revision_table.insert().execute(colvalues)
+
+        # Allow for multiple SQLAlchemy flushes/commits per VDM revision
+        revision_already_query = self.revision_table.select()
+        revision_already_query = revision_already_query.where(
+                and_(self.revision_table.c.continuity_id == instance.id,
+                    self.revision_table.c.revision_id == instance.revision.id)
+                ).count()
+        num_revisions = revision_already_query.execute().scalar()
+        revision_already = num_revisions > 0
+
+        if revision_already:
+            logging.debug('Updating version of %s: %s' % (instance, colvalues))
+            self.revision_table.update().execute(colvalues)
+        else:
+            logging.debug('Creating version of %s: %s' % (instance, colvalues))
+            self.revision_table.insert().execute(colvalues)
+
         # set to None to avoid accidental reuse
         # ERROR: cannot do this as after_* is called per object and may be run
         # before_update on other objects ...

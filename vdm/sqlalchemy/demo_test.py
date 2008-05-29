@@ -3,17 +3,14 @@ from sqlalchemy.orm import object_session
 from demo import *
 
 import logging
-# logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('vdm')
 
 
 class TestVersioning:
 
-    def teardown_class(self):
-        Session.close()
-        Session.remove()
-    
     def setup_class(self):
+        Session.begin()
         logger.debug('===== STARTING REV 1')
         session = Session()
         rev1 = Revision() 
@@ -55,6 +52,10 @@ class TestVersioning:
         # must do this after flush as timestamp not set until then
         self.ts2 = rev2.timestamp
         Session.clear()
+
+    def teardown_class(self):
+        Session.rollback()
+        Session.remove()
         
     def test_revisions_exist(self):
         revs = Revision.query.all()
