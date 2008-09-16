@@ -353,7 +353,7 @@ class Revisioner(MapperExtension):
         logger.debug('check_real_change: %s' % instance)
         table = mapper.tables[0]
         colname = 'id'
-        ctycol = instance.c[colname]
+        ctycol = table.c[colname]
         ctyval = getattr(instance, colname)
         values = table.select(ctycol==ctyval).execute().fetchone() 
         if values is None: # object not yet created
@@ -367,7 +367,7 @@ class Revisioner(MapperExtension):
         # for a save/update operation. We check here against the last version
         # to ensure we really should save this version and update the version
         # data.
-        for key in instance.c.keys():
+        for key in table.c.keys():
             if key in ignored:
                 continue
             # logger.debug('%s, %s, %s' % (key, getattr(instance, key), values[key]))
@@ -382,7 +382,8 @@ class Revisioner(MapperExtension):
         # NO GOOD working with the object as that only gets committed at next
         # flush. Need to work with the table directly (could this be dangerous)
         colvalues = {}
-        for key in instance.c.keys():
+        table = mapper.tables[0]
+        for key in table.c.keys():
             val = getattr(instance, key)
             colvalues[key] = val
         # because it is unlikely instance has been refreshed at this point the

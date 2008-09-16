@@ -1,4 +1,4 @@
-from sqlalchemy.orm import object_session
+from sqlalchemy.orm import object_session, class_mapper
 
 import vdm.sqlalchemy
 from demo import *
@@ -80,7 +80,8 @@ class TestVersioning:
     def test_basic_continuity(self):
         p1 = Package.query.filter_by(name=self.name1).one()
         pr1 = PackageRevision.query.filter_by(name=self.name1).first()
-        print pr1.c.keys()
+        table = class_mapper(PackageRevision).mapped_table
+        print table.c.keys()
         print pr1.continuity_id
         assert pr1.continuity == p1
 
