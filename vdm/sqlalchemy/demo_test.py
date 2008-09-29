@@ -7,9 +7,16 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('vdm')
 
+rebuild_db()
+# for some reason this does not work if just done in rebuild_db ...
+# WHY!!!???
+vdm.sqlalchemy.make_states(Session())
+out = State.query.all()
+assert len(out) == 2
 
 class TestVersioning:
 
+    @classmethod
     def setup_class(self):
         Session.begin()
         logger.debug('===== STARTING REV 1')
@@ -62,12 +69,20 @@ class TestVersioning:
         revs = Revision.query.all()
         assert len(revs) == 2
 
+    def test_revision_youngest(self):
+        rev = Revision.youngest()
+        assert rev.timestamp == self.ts2
+
     def test_basic(self):
         assert len(License.query.all()) == 1
         assert len(Package.query.all()) == 2
         assert 'revision_id' in LicenseRevision.c
         assert len(LicenseRevision.query.all()) == 2
         assert len(PackageRevision.query.all()) == 4
+
+    def test_all_revisions(self):
+        p1 = Package.query.filter_by(name=self.name1).one()
+        assert len(p1.all_revisions) == 2
 
     def test_basic_2(self):
         # should be at HEAD (i.e. rev2) by default 

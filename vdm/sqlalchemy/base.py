@@ -5,9 +5,12 @@ logger = logging.getLogger('vdm')
 
 # make explicit to avoid errors from typos (no attribute defns in python!)
 def set_revision(session, revision):
-    # TODO: check if we are being given the Session class (threadlocal case)
-    # if so set on both class and instance
     session.revision = revision
+    # check if we are being given the Session class (threadlocal case)
+    # if so set on both class and instance
+    if isinstance(session, sqlalchemy.orm.scoping.ScopedSession):
+        sess = session()
+        sess.revision = revision
 
 def get_revision(session):
     # NB: will return None if not set
@@ -16,6 +19,9 @@ def get_revision(session):
 ## --------------------------------------------------------
 ## VDM-Specific Domain Objects and Tables
 
+class STATE:
+    active = 'active'
+    deleted = 'deleted'
 
 def make_state_table(metadata):
     state_table = Table('state', metadata,
@@ -39,24 +45,48 @@ class State(object):
         return '<State %s>' % self.name
 
 def make_State(mapper, state_table):
-    mapper(State, state_table)
+    mapper(State, state_table,
+            order_by=state_table.c.id)
     return State
 
 def make_states(session):
     ACTIVE = State(id=1, name='active').name
     DELETED = State(id=2, name='deleted').name
-    session.commit()
+    # use flush as may not be transactional
+    if session.transactional:
+        session.commit()
+    else:
+        session.flush()
     return ACTIVE, DELETED
 
 class Revision(object):
+    '''A Revision to the Database/Domain Model.
+
+    All versioned objects have an associated Revision which can be accessed via
+    the revision attribute.
+    '''
     # TODO:? set timestamp in ctor ... (maybe not as good to have undefined
     # until actual save ...)
+
+    @classmethod
+    def youngest(self, session=None):
+        '''Get the youngest (most recent) revision.
+
+        If session is not provided assume there is a contextual session.
+        '''
+        if session:
+            q = session.query(self.__class__)
+        else: # this depends upon having a contextual session
+            q = self.query
+        q = q.order_by(self.c.id.desc())
+        return q.first()
 
     def __repr__(self):
         return '<Revision %s>' % self.id 
 
 def make_Revision(mapper, revision_table):
-    mapper(Revision, revision_table)
+    mapper(Revision, revision_table,
+            order_by=revision_table.c.id)
     return Revision
 
 ## --------------------------------------------------------
@@ -108,6 +138,10 @@ def copy_table(table, newtable):
         copy_column(key, table, newtable)
 
 def make_table_revisioned(base_table):
+    '''Modify base_table and create correponding revision table.
+
+    @ruturn revision table.
+    '''
     base_table.append_column(
             Column('revision_id', Integer, ForeignKey('revision.id'))
             )
@@ -152,8 +186,6 @@ class StatefulObjectMixin(object):
         # also support None in case this object is not yet refreshed ...
         active = self.state_obj.query.get(1)
         return self.state is None or self.state == active
-
-    # TODO: purge
 
 
 class RevisionedObjectMixin(object):
@@ -246,9 +278,9 @@ def create_object_version(mapper_fn, base_object, rev_table):
     ourmapper = mapper_fn(MyClass, rev_table, properties={
         # NB: call it all_revisions rather than just revisions because it will
         # yield all revisions not just those less than the current revision
-        # 'continuity':relation(base_object, backref=backref('all_revisions',
-        #    cascade='all, delete-orphan')),
-        'continuity':relation(base_object),
+        'continuity':relation(base_object, backref=backref('all_revisions',
+            cascade='all, delete, delete-orphan')),
+        # 'continuity':relation(base_object),
         })
     base_mapper = class_mapper(base_object)
     # add in 'relationship' stuff from continuity onto revisioned obj
@@ -393,11 +425,11 @@ class Revisioner(MapperExtension):
         colvalues['continuity_id'] = instance.id
 
         # Allow for multiple SQLAlchemy flushes/commits per VDM revision
-        revision_already_query = self.revision_table.select()
+        revision_already_query = self.revision_table.count()
         revision_already_query = revision_already_query.where(
                 and_(self.revision_table.c.continuity_id == instance.id,
                     self.revision_table.c.revision_id == instance.revision.id)
-                ).count()
+                )
         num_revisions = revision_already_query.execute().scalar()
         revision_already = num_revisions > 0
 

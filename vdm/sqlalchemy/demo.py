@@ -12,10 +12,27 @@ from sqlalchemy import *
 
 import vdm.sqlalchemy
 
-engine = create_engine('sqlite:///:memory:',
-        # echo=True
-        )
+engine = create_engine('sqlite:///:memory:')
+# engine = create_engine('postgres://ckantest:pass@localhost/vdmtest')
 metadata = MetaData(bind=engine)
+
+
+# fix up table dropping on postgres
+# http://blog.pythonisito.com/2008/01/cascading-drop-table-with-sqlalchemy.html
+from sqlalchemy.databases import postgres
+
+class PGCascadeSchemaDropper(postgres.PGSchemaDropper):
+     def visit_table(self, table):
+        for column in table.columns:
+            if column.default is not None:
+                self.traverse_single(column.default)
+        self.append("\nDROP TABLE " +
+                    self.preparer.format_table(table) +
+                    " CASCADE")
+        self.execute()
+
+postgres.dialect.schemadropper = PGCascadeSchemaDropper
+
 
 ## VDM-specific tables
 
@@ -59,8 +76,6 @@ tag_revision_table = vdm.sqlalchemy.make_table_revisioned(tag_table)
 # TODO: this has a composite primary key ...
 package_tag_revision_table = vdm.sqlalchemy.make_table_revisioned(package_tag_table)
 
-
-metadata.create_all(engine) 
 
 
 ## -------------------
@@ -164,6 +179,17 @@ vdm.sqlalchemy.add_stateful_versioned_m2m(Package, PackageTag, 'tags', 'tag',
         'package_tags')
 vdm.sqlalchemy.add_stateful_versioned_m2m_on_version(PackageRevision, 'tags')
 
-# need to set up the basic states for all Stateful stuff to work
-ACTIVE, DELETED = vdm.sqlalchemy.make_states(Session())
+
+def rebuild_db():
+    logger.info('Rebuilding DB')
+    metadata.drop_all(engine)
+    metadata.create_all(engine) 
+    vdm.sqlalchemy.make_states(Session())
+    Session.clear()
+    Session.remove()
+
+rebuild_db()
+ACTIVE = 'active'
+DELETED =  'deleted'
+
 

@@ -13,6 +13,9 @@ class TestMisc:
         Session.remove()
 
     def test_column_create(self):
+        tabxyz = Table('xyz', metadata,
+            Column('id', Integer, primary_key=True)
+            )
         col = Column('abc', Integer, ForeignKey('xyz.id'))
         # FK does *not* work
         assert len(col.foreign_keys) == 0
