@@ -12,8 +12,8 @@ from sqlalchemy import *
 
 import vdm.sqlalchemy
 
-engine = create_engine('sqlite:///:memory:')
-# engine = create_engine('postgres://ckantest:pass@localhost/vdmtest')
+# engine = create_engine('sqlite:///:memory:')
+engine = create_engine('postgres://ckantest:pass@localhost/vdmtest')
 metadata = MetaData(bind=engine)
 
 
@@ -150,7 +150,7 @@ mapper(Package, package_table, properties={
     # 
     # do we want lazy=False here? used in:
     # <http://www.sqlalchemy.org/trac/browser/sqlalchemy/trunk/examples/association/proxied_association.py>
-    'package_tags':relation(PackageTag, cascade='all'), #, delete-orphan'),
+    'package_tags':relation(PackageTag, backref='package', cascade='all'), #, delete-orphan'),
     },
     extension = vdm.sqlalchemy.Revisioner(package_revision_table)
     )
@@ -158,7 +158,6 @@ mapper(Package, package_table, properties={
 mapper(Tag, tag_table)
 
 mapper(PackageTag, package_tag_table, properties={
-    'package':relation(Package),
     'tag':relation(Tag),
     },
     extension = vdm.sqlalchemy.Revisioner(package_tag_revision_table)
@@ -180,11 +179,16 @@ vdm.sqlalchemy.add_stateful_versioned_m2m(Package, PackageTag, 'tags', 'tag',
 vdm.sqlalchemy.add_stateful_versioned_m2m_on_version(PackageRevision, 'tags')
 
 
+def make_states():
+    states = State.query.all()
+    if len(states) == 0:
+        vdm.sqlalchemy.make_states(Session())
+
 def rebuild_db():
     logger.info('Rebuilding DB')
     metadata.drop_all(engine)
     metadata.create_all(engine) 
-    vdm.sqlalchemy.make_states(Session())
+    make_states()
     Session.clear()
     Session.remove()
 

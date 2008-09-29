@@ -13,8 +13,11 @@ def set_revision(session, revision):
         sess.revision = revision
 
 def get_revision(session):
-    # NB: will return None if not set
-    return session.revision
+    '''Get revision on current Session/session.
+    
+    NB: will return None if not set
+    '''
+    return getattr(session, 'revision', None)
 
 ## --------------------------------------------------------
 ## VDM-Specific Domain Objects and Tables
@@ -426,16 +429,20 @@ class Revisioner(MapperExtension):
 
         # Allow for multiple SQLAlchemy flushes/commits per VDM revision
         revision_already_query = self.revision_table.count()
+        existing_revision_clause = and_(
+                self.revision_table.c.continuity_id == instance.id,
+                self.revision_table.c.revision_id == instance.revision.id)
         revision_already_query = revision_already_query.where(
-                and_(self.revision_table.c.continuity_id == instance.id,
-                    self.revision_table.c.revision_id == instance.revision.id)
+                existing_revision_clause
                 )
         num_revisions = revision_already_query.execute().scalar()
         revision_already = num_revisions > 0
 
         if revision_already:
             logging.debug('Updating version of %s: %s' % (instance, colvalues))
-            self.revision_table.update().execute(colvalues)
+            # print self.revision_table.c.keys()
+            # print self.revision_table.select().execute().fetchall()
+            self.revision_table.update(existing_revision_clause).execute(colvalues)
         else:
             logging.debug('Creating version of %s: %s' % (instance, colvalues))
             self.revision_table.insert().execute(colvalues)

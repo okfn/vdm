@@ -7,18 +7,15 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('vdm')
 
-rebuild_db()
-# for some reason this does not work if just done in rebuild_db ...
-# WHY!!!???
-vdm.sqlalchemy.make_states(Session())
-out = State.query.all()
-assert len(out) == 2
 
 class TestVersioning:
 
     @classmethod
     def setup_class(self):
-        Session.begin()
+        rebuild_db()
+        # does not work if just done in rebuild_db (WHY!!!???)
+        make_states()
+
         logger.debug('===== STARTING REV 1')
         session = Session()
         rev1 = Revision() 
@@ -62,7 +59,6 @@ class TestVersioning:
         Session.clear()
 
     def teardown_class(self):
-        Session.rollback()
         Session.remove()
         
     def test_revisions_exist(self):
@@ -148,3 +144,34 @@ class TestVersioning:
         assert len(p1.tags) == 0
         assert len(p1r1.tags) == 0
        
+class TestVersioning2:
+
+    @classmethod
+    def setup_class(self):
+        rebuild_db()
+        logger.debug('====== TestVersioning2: start')
+
+        rev1 = Revision() 
+        vdm.sqlalchemy.set_revision(Session, rev1)
+        
+        self.name1 = 'anna'
+        p1 = Package(name=self.name1)
+        t1 = Tag(name='geo')
+        t2 = Tag(name='geo2')
+        p1.tags.append(t1)
+        p1.tags.append(t2)
+        Session.commit()
+    
+        # can only get it after the flush
+        self.rev1_id = rev1.id
+        Session.remove()
+
+        # rev2 = Revision() 
+        # vdm.sqlalchemy.set_revision(Session, rev2)
+
+    def test_1(self):
+        # rev1 = Revision.query.get(self.rev1_id)
+        p1 = Package.query.filter_by(name=self.name1).one()
+        print p1.tags
+        assert len(p1.tags) == 2
+
