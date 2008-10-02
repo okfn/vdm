@@ -89,7 +89,7 @@ class Revision(object):
 
 def make_Revision(mapper, revision_table):
     mapper(Revision, revision_table,
-            order_by=revision_table.c.id)
+            order_by=revision_table.c.id.desc())
     return Revision
 
 ## --------------------------------------------------------

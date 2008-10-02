@@ -64,6 +64,8 @@ class TestVersioning:
     def test_revisions_exist(self):
         revs = Revision.query.all()
         assert len(revs) == 2
+        # also check order (youngest first)
+        assert revs[0].id > revs[1].id
 
     def test_revision_youngest(self):
         rev = Revision.youngest()
