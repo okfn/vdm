@@ -177,3 +177,7 @@ class TestVersioning2:
         print p1.tags
         assert len(p1.tags) == 2
 
+    def test_revision_has_state(self):
+        rev1 = Revision.query.get(self.rev1_id)
+        assert rev1.state.name == ACTIVE
+

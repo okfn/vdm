@@ -3,6 +3,23 @@ from datetime import datetime
 import logging
 logger = logging.getLogger('vdm')
 
+## -------------------------------------
+## Really Generic Stuff
+
+class SQLAlchemyMixin(object):
+        def __str__(self):
+            repr = u'<%s' % self.__class__.__name__
+            table = sqlalchemy.orm.class_mapper(self.__class__).mapped_table
+            for col in table.c:
+                repr += u' %s=%s' % (col.name, getattr(self, col.name))
+            repr += '>'
+            return repr
+
+        def __repr__(self):
+            return self.__str__()
+
+## -------------------------------------
+
 # make explicit to avoid errors from typos (no attribute defns in python!)
 def set_revision(session, revision):
     session.revision = revision
@@ -22,9 +39,10 @@ def get_revision(session):
 ## --------------------------------------------------------
 ## VDM-Specific Domain Objects and Tables
 
-class STATE:
-    active = 'active'
-    deleted = 'deleted'
+# TODO: (?) transition to name based states
+# class STATE:
+#    active = 'active'
+#    deleted = 'deleted'
 
 def make_state_table(metadata):
     state_table = Table('state', metadata,
@@ -38,11 +56,12 @@ def make_revision_table(metadata):
             Column('id', Integer, primary_key=True),
             Column('timestamp', DateTime, default=datetime.now),
             Column('author', String(200)),
-            Column('message', Text),
+            Column('message', UnicodeText),
+            Column('state_id', Integer, ForeignKey('state.id'), default=1)
             )
     return revision_table
 
-class State(object):
+class State(SQLAlchemyMixin):
 
     def __repr__(self):
         return '<State %s>' % self.name
@@ -62,7 +81,7 @@ def make_states(session):
         session.flush()
     return ACTIVE, DELETED
 
-class Revision(object):
+class Revision(SQLAlchemyMixin):
     '''A Revision to the Database/Domain Model.
 
     All versioned objects have an associated Revision which can be accessed via
@@ -88,8 +107,10 @@ class Revision(object):
         return '<Revision %s>' % self.id 
 
 def make_Revision(mapper, revision_table):
-    mapper(Revision, revision_table,
-            order_by=revision_table.c.id.desc())
+    mapper(Revision, revision_table, properties={
+        'state':relation(State)
+        },
+        order_by=revision_table.c.id.desc())
     return Revision
 
 ## --------------------------------------------------------
@@ -243,7 +264,6 @@ class RevisionedObjectMixin(object):
             else:
                 return out.first()
 
-
 ## --------------------------------------------------------
 ## Mapper Helpers
 
@@ -269,8 +289,9 @@ def create_object_version(mapper_fn, base_object, rev_table):
     '''
     # TODO: can we always assume all versioned objects are stateful?
     # If not need to do an explicit check
-    class MyClass(StatefulObjectMixin):
+    class MyClass(StatefulObjectMixin, SQLAlchemyMixin):
         pass
+
     name = base_object.__name__ + 'Revision'
     MyClass.__name__ = name
     MyClass.__continuity_class__ = base_object
