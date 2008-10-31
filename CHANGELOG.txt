@@ -1,0 +1,23 @@
+v0.3 2008-10-31
+===============
+
+  * No substantial new features but lots of bugfixes
+  * Better compatability with SQLAlchemy v0.5
+  * Revision has several new convenience methods and utilizes State
+
+v0.2 2008-05-30 
+===============
+
+  * SQLAlchemy support (major rewrite)
+  * Customized to sqlalchemy with major performance improvements
+  * Utilizes 'cache-head-on-continuity' model
+  * Greatly improved documentation
+  * See announce: <http://blog.okfn.org/2008/05/30/versioned-domain-model-v02-with-support-for-sqlalchemy-released/>
+
+v0.1 2007-02
+============
+
+  * Full and functioning SQLObject system
+  * Support for basic versioned objects
+  * Support for m2m
+  * Atomic commits and Revision object
