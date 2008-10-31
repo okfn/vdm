@@ -8,16 +8,18 @@ v0.3 2008-10-31
 v0.2 2008-05-30 
 ===============
 
-  * SQLAlchemy support (major rewrite)
+  * SQLAlchemy implementation of versioned domain model (major)
   * Customized to sqlalchemy with major performance improvements
   * Utilizes 'cache-head-on-continuity' model
+  * Partial Elixir implementation.
+  * Various (minor) bugfixes and improvments for SQLObject version
   * Greatly improved documentation
   * See announce: <http://blog.okfn.org/2008/05/30/versioned-domain-model-v02-with-support-for-sqlalchemy-released/>
 
 v0.1 2007-02
 ============
 
-  * Full and functioning SQLObject system
+  * Fully functional SQLObject implementation of versioned domain model.
   * Support for basic versioned objects
   * Support for m2m
   * Atomic commits and Revision object

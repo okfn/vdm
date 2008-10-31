@@ -17,7 +17,7 @@ setup(
     long_description = __long_description__,
     license = "MIT",
     keywords = "versioning sqlobject sqlalchemy orm",
-    url = "http://knowledgeforge.net/ckan/svn/vdm/trunk/README.txt", 
+    url = "http://www.okfn.org/", 
     download_url = "http://knowledgeforge.net/ckan/svn/vdm/trunk",
     zip_safe = False,
     classifiers = [
