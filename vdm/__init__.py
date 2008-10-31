@@ -8,8 +8,7 @@ subversion allow you version your code. In particular, versioned domain model
 versions a complete model and not just individual domain objects (for more on
 this distinction see below).
 
-At present the package is provided as an extension to SQLAlchemy and SQLObject
-(with an extension to Elixir in progress).
+At present the package is provided as an extension to SQLAlchemy and SQLObject.
 
 
 Copyright and License
@@ -102,10 +101,6 @@ To see some real code in action take a look at::
     vdm/sqlobject/demo.py
     vdm/sqlobject/demo_test.py
 
-The code for elixir, which is not yet fully functional, can be found in::
-
-    vdm/elixir/
-
 
 General Conceptual Documentation
 ================================
@@ -135,8 +130,7 @@ Remark: using the first approach it is:
     one atomic change
   * Difficult to support domain model traversal, that is the ability to
     navigate around the domain model at a particular 'revision'/point-in-time.
-  * More discussions of limitations can be found in this thread [1] as well as
-    in vdm/elixir/README.txt.
+  * More discussions of limitations can be found in this thread [1].
 
 [1]:<http://groups.google.com/group/sqlelixir/browse_thread/thread/50aee902ce3555fb/>
 
