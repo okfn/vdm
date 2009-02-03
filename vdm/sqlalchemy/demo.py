@@ -13,7 +13,7 @@ from sqlalchemy import *
 import vdm.sqlalchemy
 
 # engine = create_engine('sqlite:///:memory:')
-engine = create_engine('postgres://ckantest:pass@localhost/vdmtest')
+engine = create_engine('postgres://tester:pass@localhost/vdmtest')
 metadata = MetaData(bind=engine)
 
 
@@ -47,8 +47,11 @@ license_table = Table('license', metadata,
         Column('open', Boolean),
         )
 
+import uuid
+def uuidstr(): return str(uuid.uuid4())
 package_table = Table('package', metadata,
-        Column('id', Integer, primary_key=True),
+        # Column('id', Integer, primary_key=True),
+        Column('id', String(36), default=uuidstr, primary_key=True),
         Column('name', String(100)),
         Column('title', String(100)),
         Column('license_id', Integer, ForeignKey('license.id')),
@@ -61,7 +64,8 @@ tag_table = Table('tag', metadata,
 
 package_tag_table = Table('package_tag', metadata,
         Column('id', Integer, primary_key=True),
-        Column('package_id', Integer, ForeignKey('package.id')),
+        # Column('package_id', Integer, ForeignKey('package.id')),
+        Column('package_id', String(36), ForeignKey('package.id')),
         Column('tag_id', Integer, ForeignKey('tag.id')),
         )
 

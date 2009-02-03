@@ -138,5 +138,5 @@ The versioned domain model (vdm) package focuses on supporting the second case
 (this obviously includes the first one as a subcase) -- hence the name.
 
 '''
-__version__ = '0.3'
+__version__ = '0.4a'
 __description__ = 'A versioned domain model framework.'

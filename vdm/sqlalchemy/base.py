@@ -164,7 +164,10 @@ def copy_table(table, newtable):
 def make_table_revisioned(base_table):
     '''Modify base_table and create correponding revision table.
 
-    @ruturn revision table.
+    # TODO: (complex) support for complex primary keys on continuity. 
+    # Search for "composite foreign key sqlalchemy" for helpful info
+
+    @return revision table.
     '''
     base_table.append_column(
             Column('revision_id', Integer, ForeignKey('revision.id'))
@@ -172,13 +175,29 @@ def make_table_revisioned(base_table):
     newtable = Table(base_table.name + '_revision', base_table.metadata,
             )
     copy_table(base_table, newtable)
-    # TODO: (complex) support for complex primary keys on continuity. 
-    # setting fks here will not work
-    fk_name = base_table.name + '.id'
-    newtable.append_column(
-            Column('continuity_id', Integer, ForeignKey(fk_name))
-            )
 
+    # create foreign key 'continuity' constraint
+    # remember base table primary cols have been exactly duplicated onto our table
+    pkcols = []
+    for col in base_table.c:
+        if col.primary_key:
+            pkcols.append(col)
+    if len(pkcols) > 1:
+        msg = 'Do not support versioning objects with multiple primary keys'
+        raise ValueError(msg)
+    fk_name = base_table.name + '.' + pkcols[0].name
+    newtable.append_column(
+        Column('continuity_id', pkcols[0].type, ForeignKey(fk_name))
+        )
+    # TODO: a start on composite primary key stuff
+    # newtable.append_constraint(
+    #        ForeignKeyConstraint(
+    #            [c.name for c in pkcols],
+    #            [base_table.name + '.' + c.name for c in pkcols ]
+    #    ))
+
+    # TODO: why do we iterate all the way through rather than just using dict
+    # functionality ...? Surely we always have a revision here ...
     for col in newtable.c:
         if col.name == 'revision_id':
             col.primary_key = True
