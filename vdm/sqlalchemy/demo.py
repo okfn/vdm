@@ -16,24 +16,6 @@ import vdm.sqlalchemy
 engine = create_engine('postgres://tester:pass@localhost/vdmtest')
 metadata = MetaData(bind=engine)
 
-
-# fix up table dropping on postgres
-# http://blog.pythonisito.com/2008/01/cascading-drop-table-with-sqlalchemy.html
-from sqlalchemy.databases import postgres
-
-class PGCascadeSchemaDropper(postgres.PGSchemaDropper):
-     def visit_table(self, table):
-        for column in table.columns:
-            if column.default is not None:
-                self.traverse_single(column.default)
-        self.append("\nDROP TABLE " +
-                    self.preparer.format_table(table) +
-                    " CASCADE")
-        self.execute()
-
-postgres.dialect.schemadropper = PGCascadeSchemaDropper
-
-
 ## VDM-specific tables
 
 state_table = vdm.sqlalchemy.make_state_table(metadata)
@@ -181,23 +163,4 @@ from base import add_stateful_versioned_m2m
 vdm.sqlalchemy.add_stateful_versioned_m2m(Package, PackageTag, 'tags', 'tag',
         'package_tags')
 vdm.sqlalchemy.add_stateful_versioned_m2m_on_version(PackageRevision, 'tags')
-
-
-def make_states():
-    states = State.query.all()
-    if len(states) == 0:
-        vdm.sqlalchemy.make_states(Session())
-
-def rebuild_db():
-    logger.info('Rebuilding DB')
-    metadata.drop_all(engine)
-    metadata.create_all(engine) 
-    make_states()
-    Session.clear()
-    Session.remove()
-
-rebuild_db()
-ACTIVE = 'active'
-DELETED =  'deleted'
-
 

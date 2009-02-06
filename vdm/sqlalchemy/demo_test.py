@@ -7,14 +7,17 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('vdm')
 
+from tools import Repository
+repo = Repository(metadata, Session)
+ACTIVE = 'active'
+DELETED = 'deleted'
 
 class TestVersioning:
 
     @classmethod
     def setup_class(self):
-        rebuild_db()
-        # does not work if just done in rebuild_db (WHY!!!???)
-        make_states()
+        repo.rebuild_db()
+        repo.init_vdm()
 
         logger.debug('===== STARTING REV 1')
         session = Session()
@@ -150,7 +153,8 @@ class TestVersioning2:
 
     @classmethod
     def setup_class(self):
-        rebuild_db()
+        repo.rebuild_db()
+        repo.init_vdm()
         logger.debug('====== TestVersioning2: start')
 
         rev1 = Revision() 
@@ -171,7 +175,7 @@ class TestVersioning2:
         # rev2 = Revision() 
         # vdm.sqlalchemy.set_revision(Session, rev2)
 
-    def test_1(self):
+    def test_basics(self):
         # rev1 = Revision.query.get(self.rev1_id)
         p1 = Package.query.filter_by(name=self.name1).one()
         print p1.tags
@@ -180,4 +184,35 @@ class TestVersioning2:
     def test_revision_has_state(self):
         rev1 = Revision.query.get(self.rev1_id)
         assert rev1.state.name == ACTIVE
+
+class TestRevertAndPurge:
+
+    @classmethod
+    def setup_class(self):
+        Session.remove()
+        repo.rebuild_db()
+        repo.init_vdm()
+
+        rev1 = Revision() 
+        vdm.sqlalchemy.set_revision(Session, rev1)
+        
+        self.name1 = 'anna'
+        p1 = Package(name=self.name1)
+        Session.commit()
+        repo.commit()
+        Session.remove()
+
+        self.name2 = 'warandpeace'
+        rev2 = repo.new_revision()
+        p1 = Package.query.filter_by(name=self.name1).one()
+        p1.name = self.name2
+        repo.commit()
+
+    @classmethod
+    def teardown_class(self):
+        pass
+
+    def test_basics(self):
+        p1 = Package.query.filter_by(name=self.name2).one()
+        assert p1.name == self.name2
 

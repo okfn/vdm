@@ -7,16 +7,16 @@ logger = logging.getLogger('vdm')
 ## Really Generic Stuff
 
 class SQLAlchemyMixin(object):
-        def __str__(self):
-            repr = u'<%s' % self.__class__.__name__
-            table = sqlalchemy.orm.class_mapper(self.__class__).mapped_table
-            for col in table.c:
-                repr += u' %s=%s' % (col.name, getattr(self, col.name))
-            repr += '>'
-            return repr
+    def __str__(self):
+        repr = u'<%s' % self.__class__.__name__
+        table = sqlalchemy.orm.class_mapper(self.__class__).mapped_table
+        for col in table.c:
+            repr += u' %s=%s' % (col.name, getattr(self, col.name))
+        repr += '>'
+        return repr
 
-        def __repr__(self):
-            return self.__str__()
+    def __repr__(self):
+        return self.__str__()
 
 ## -------------------------------------
 
@@ -70,16 +70,6 @@ def make_State(mapper, state_table):
     mapper(State, state_table,
             order_by=state_table.c.id)
     return State
-
-def make_states(session):
-    ACTIVE = State(id=1, name='active').name
-    DELETED = State(id=2, name='deleted').name
-    # use flush as may not be transactional
-    if session.transactional:
-        session.commit()
-    else:
-        session.flush()
-    return ACTIVE, DELETED
 
 class Revision(SQLAlchemyMixin):
     '''A Revision to the Database/Domain Model.
