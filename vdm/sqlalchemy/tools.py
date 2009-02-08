@@ -46,23 +46,36 @@ class Repository(object):
             self.metadata.bind = engine 
             self.session.bind = engine
 
+    def create_db(self):
+        logger.info('Creating DB')
+        self.metadata.create_all(bind=self.metadata.bind)    
+
+    def clean_db(self):
+        logger.info('Cleaning DB')
+        self.metadata.drop_all(bind=self.metadata.bind)
+
     def rebuild_db(self):
         logger.info('Rebuilding DB')
-        self.metadata.drop_all(bind=self.metadata.bind)
-        self.metadata.create_all(bind=self.metadata.bind)
+        self.clean_db()
+        self.create_db()
+        self.init_db()
 
-    def make_states(self, session):
-        ACTIVE = State(id=1, name='active').name
-        DELETED = State(id=2, name='deleted').name
-        self.commit()
-        return ACTIVE, DELETED
-
-    def init_vdm(self):
+    def init_db(self):
+        logger.info('Initing DB') 
+        self.create_db()
         states = State.query.all()
         if len(states) == 0:
-            self.make_states(self.session())
+            ACTIVE = State(id=1, name='active').name
+            DELETED = State(id=2, name='deleted').name
+            self.commit()
         self.session.remove()
 
+    def new_revision(self):                                   
+        '''Convenience method to create new revision and set it on session.'''
+        rev = Revision()                                      
+        set_revision(self.session, rev)             
+        return rev
+        
     def commit(self, remove=True):
         if self.transactional:
             self.session.commit()

@@ -17,7 +17,6 @@ class TestVersioning:
     @classmethod
     def setup_class(self):
         repo.rebuild_db()
-        repo.init_vdm()
 
         logger.debug('===== STARTING REV 1')
         session = Session()
@@ -154,7 +153,6 @@ class TestVersioning2:
     @classmethod
     def setup_class(self):
         repo.rebuild_db()
-        repo.init_vdm()
         logger.debug('====== TestVersioning2: start')
 
         rev1 = Revision() 
@@ -191,7 +189,6 @@ class TestRevertAndPurge:
     def setup_class(self):
         Session.remove()
         repo.rebuild_db()
-        repo.init_vdm()
 
         rev1 = Revision() 
         vdm.sqlalchemy.set_revision(Session, rev1)

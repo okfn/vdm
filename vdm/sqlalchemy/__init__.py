@@ -34,6 +34,7 @@ TODO
 5. Support for diffing and reverting.
 '''
 from base import *
+from tools import Repository
 
 __all__ = [
         'set_revision', 'get_revision',
@@ -43,6 +44,6 @@ __all__ = [
         'StatefulObjectMixin', 'RevisionedObjectMixin',
         'Revisioner', 'modify_base_object_mapper', 'create_object_version',
         'add_stateful_versioned_m2m', 'add_stateful_versioned_m2m_on_version',
-        'make_states',
+        'Repository'
         ]
 

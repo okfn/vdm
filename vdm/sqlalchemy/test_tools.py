@@ -12,9 +12,10 @@ class TestRepository:
 
     def test_init_vdm(self):
         self.repo.session.remove()
-        self.repo.rebuild_db()
+        self.repo.clean_db()
+        self.repo.create_db()
         assert len(State.query.all()) == 0
-        self.repo.init_vdm()
+        self.repo.init_db()
         assert len(State.query.all()) == 2
 
     def test_new_revision(self):
