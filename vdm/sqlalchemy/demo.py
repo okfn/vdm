@@ -58,7 +58,6 @@ vdm.sqlalchemy.make_table_stateful(tag_table)
 vdm.sqlalchemy.make_table_stateful(package_tag_table)
 license_revision_table = vdm.sqlalchemy.make_table_revisioned(license_table)
 package_revision_table = vdm.sqlalchemy.make_table_revisioned(package_table)
-tag_revision_table = vdm.sqlalchemy.make_table_revisioned(tag_table)
 # TODO: this has a composite primary key ...
 package_tag_revision_table = vdm.sqlalchemy.make_table_revisioned(package_tag_table)
 

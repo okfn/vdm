@@ -22,18 +22,29 @@ postgres.dialect.schemadropper = PGCascadeSchemaDropper
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import ScopedSession
-from base import set_revision, State, Revision
-class Repository(object):
-    def __init__(self, our_metadata, our_session, dburi=None):
-        '''
-        TODO: deal with scoped versus non-scoped sessions ... 
-            e.g. in init_vdm
+from sqlalchemy.orm import class_mapper
+from sqlalchemy.orm import object_session
 
+from base import set_revision, State, Revision
+
+class Repository(object):
+    '''Manage repository-wide type changes for versioned domain models.
+
+    For example:
+        * creating, cleaning and initializing the repository (DB).
+        * purging revisions
+    '''
+    def __init__(self, our_metadata, our_session, versioned_objects=None, dburi=None):
+        '''
+        @param versioned_objects: list of classes of objects which are
+        versioned (NB: not the object *versions* but the continuity objects
+        themselves). Needed because this will vary from vdm to vdm.
         @param dburi: sqlalchemy dburi. If supplied will create engine and bind
         it to metadata and session.
         '''
         self.metadata = our_metadata
         self.session = our_session
+        self.versioned_objects = versioned_objects
         self.dburi = dburi
         self.have_scoped_session = isinstance(self.session, ScopedSession)
         self.transactional = False 
@@ -76,58 +87,74 @@ class Repository(object):
         set_revision(self.session, rev)             
         return rev
         
-    def commit(self, remove=True):
+    def commit(self):
+        '''Commit/flush (as appropriate) the Sqlalchemy session.'''
+        # TODO: should we do something like set the revision state as well ...
         if self.transactional:
-            self.session.commit()
+            try:
+                self.session.commit()
+            except:
+                self.session.rollback()
+                # should we remove?
+                self.session.remove()
+                raise
         else:
             self.session.flush()
-        if remove:
-            self.session.remove()
+    
+    def commit_and_remove(self):
+        self.commit()
+        self.session.remove()
     
     def new_revision(self):
         rev = Revision()
         set_revision(self.session, rev)
         return rev
 
+    def list_changes(self, revision):
+        '''List all objects changed by this `revision`.
 
-from sqlalchemy.orm import class_mapper
-class PurgeRevision(object):
-    '''Purge all changes associated with a revision.
+        @return: dictionary of changed instances keyed by object class.
+        '''
+        results = {}
+        for o in self.versioned_objects:
+            revobj = o.__revision_class__
+            items = revobj.query.filter_by(revision=revision).all()
+            results[o] = items
+        return results
 
-    @param leave_record: if True leave revision in existence but change message
-        to "PURGED: {date-time-of-purge}". If false delete revision object as
-        well.
+    def purge_revision(self, revision, leave_record=False):
+        '''Purge all changes associated with a revision.
 
-    Summary of the Algorithm
-    ------------------------
+        @param leave_record: if True leave revision in existence but change message
+            to "PURGED: {date-time-of-purge}". If false delete revision object as
+            well.
 
-    # list everything affected by this transaction
-    # check continuity objects and cascade on everything else ?
-    # crudely get all object revisions associated with this
-    # then check whether this is the only revision and delete the
-    # continuity object
+        Summary of the Algorithm
+        ------------------------
 
-    # alternatively delete all associated object revisions\
-    # then do a select on continutity to check which have zero associated
-    # revisions (should only be these ...)
-    '''
+        1. list all RevisionObjects affected by this revision
+        2. check continuity objects and cascade on everything else ?
+            1. crudely get all object revisions associated with this
+            2. then check whether this is the only revision and delete the
+            continuity object
 
-    def __init__(self, revision, leave_record=True):
-        super(PurgeRevision, self).__init__()
-        self.revision = revision
-        self.leave_record = leave_record
-        self.versioned_objects = versioned_objects
-        self.revision_objects = [ obj.__revision_class__ for obj in
-                self.versioned_objects ]
-
-    def execute(self):
-        logger.debug('Purging revision: %s' % self.revision.id)
+            3. ALTERNATIVELY delete all associated object revisions then do a
+            select on continutity to check which have zero associated revisions
+            (should only be these ...)
+        '''
+        logger.debug('Purging revision: %s' % revision.id)
         to_purge = []
-        for revobj in self.revision_objects:
-            items = revobj.query.filter_by(revision=self.revision)
+        # have to set on both instance and ScopedSession
+        # see comments in base.set_revision
+        self.session.revisioning_disabled = True 
+        self.session().revisioning_disabled = True 
+        for o in self.versioned_objects:
+            revobj = o.__revision_class__
+            items = revobj.query.filter_by(revision=revision).all()
             for item in items:
                 continuity = item.continuity
-                if continuity.revision == self.revision:
+
+                if continuity.revision == revision: # need to change continuity
                     trevobjs = revobj.query.filter_by(
                             continuity=continuity
                             ).order_by(revobj.c.revision_id.desc()).limit(2).all()
@@ -137,29 +164,34 @@ class PurgeRevision(object):
                         to_purge.append(continuity)
                     else:
                         new_correct_revobj = trevobjs[1] # older one
-                        # revert continuity object back to original version
-                        table = class_mapper(continuity.__class__).mapped_table
-                        # TODO: ? this will only set columns and not mapped attribs
-                        # TODO: need to do this directly on table or disable
-                        # revisioning behaviour ...
-                        for key in table.c.keys():
-                            value = getattr(new_correct_revobj, key)
-                            print key, value
-                            print 'old:', getattr(continuity, key)
-                            setattr(continuity, key, value)
-                model.Session.delete(item)
-        for item in to_purge:
-            item.purge()
-        if self.leave_record:
-            self.revision.message = 'PURGED'
+                        self.revert(continuity, new_correct_revobj)
+                # now delete revision object
+                self.session.delete(item)
+            for cont in to_purge:
+                self.session.delete(cont)
+        if leave_record:
+            import datetime
+            revision.message = 'PURGED: %s' % datetime.datetime.now()
         else:
-            model.Session.delete(self.revision)
+            self.session.delete(revision)
+        self.commit_and_remove()
 
-        # now commit changes
-        try:
-            model.Session.commit()
-        except:
-            model.Session.rollback()
-            model.Session.remove()
-            raise
+    def revert(self, continuity, new_correct_revobj):
+        '''Revert continuity object back to a particular revision_object.
+        
+        NB: does *not* call flush/commit.
+        '''
+        logger.debug('revert: %s' % continuity)
+        table = class_mapper(continuity.__class__).mapped_table
+        # TODO: ? this will only set columns and not mapped attribs
+        # TODO: need to do this directly on table or disable
+        # revisioning behaviour ...
+        for key in table.c.keys():
+            value = getattr(new_correct_revobj, key)
+            # logger.debug('%s::%s' % (key, value))
+            # logger.debug('old: %s' % getattr(continuity, key))
+            setattr(continuity, key, value)
+        logger.debug('revert: end: %s' % continuity)
+        logger.debug(object_session(continuity))
+        logger.debug(self.session)
 

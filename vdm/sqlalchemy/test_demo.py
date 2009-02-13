@@ -5,10 +5,12 @@ from demo import *
 
 import logging
 logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('vdm')
 
 from tools import Repository
-repo = Repository(metadata, Session)
+repo = Repository(metadata, Session,
+        versioned_objects = [ Package, License,  PackageTag ])
 ACTIVE = 'active'
 DELETED = 'deleted'
 
@@ -195,21 +197,49 @@ class TestRevertAndPurge:
         
         self.name1 = 'anna'
         p1 = Package(name=self.name1)
-        Session.commit()
-        repo.commit()
-        Session.remove()
+        p2 = Package(name='blahblah')
+        repo.commit_and_remove()
 
         self.name2 = 'warandpeace'
+        self.lname = 'testlicense'
         rev2 = repo.new_revision()
         p1 = Package.query.filter_by(name=self.name1).one()
         p1.name = self.name2
+        l1 = License(name=self.lname)
         repo.commit()
+        self.rev2id = rev2.id
+        Session.remove()
 
     @classmethod
     def teardown_class(self):
         pass
 
     def test_basics(self):
+        revs = Revision.query.all()
+        assert len(revs) == 2
         p1 = Package.query.filter_by(name=self.name2).one()
         assert p1.name == self.name2
+        assert len(Package.query.all()) == 2
+
+    def test_list_changes(self):
+        rev2 = Revision.query.get(self.rev2id)
+        out = repo.list_changes(rev2)
+        assert len(out) == 3
+        assert len(out[Package]) == 1, out
+        assert len(out[License]) == 1, out
+
+    def test_purge_revision(self):
+        logger.debug('BEGINNING PURGE REVISION')
+        Session.remove()
+        rev2 = Revision.query.get(self.rev2id)
+        repo.purge_revision(rev2)
+        revs = Revision.query.all()
+        assert len(revs) == 1
+        p1 = Package.query.filter_by(name=self.name1).first()
+        assert p1 is not None
+        assert len(License.query.all()) == 0
+        pkgs = Package.query.all()
+        assert len(pkgs) == 2, pkgrevs
+        pkgrevs = PackageRevision.query.all()
+        assert len(pkgrevs) == 2, pkgrevs
 

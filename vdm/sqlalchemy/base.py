@@ -25,6 +25,8 @@ def set_revision(session, revision):
     session.revision = revision
     # check if we are being given the Session class (threadlocal case)
     # if so set on both class and instance
+    # this is important because sqlalchemy's object_session (used below) seems
+    # to return a Session() not Session
     if isinstance(session, sqlalchemy.orm.scoping.ScopedSession):
         sess = session()
         sess.revision = revision
@@ -386,9 +388,15 @@ class Revisioner(MapperExtension):
     def __init__(self, revision_table):
         self.revision_table = revision_table
 
+    def revisioning_disabled(self, instance):
+        # logger.debug('revisioning_disabled: %s' % instance)
+        sess = object_session(instance)
+        disabled = getattr(sess, 'revisioning_disabled', False)
+        return disabled
+
     def set_revision(self, instance):
         sess = object_session(instance)
-        current_rev = sess.revision
+        current_rev = get_revision(sess) 
         # was using revision_id but this led to weird intermittent erros
         # (1/3: fail on first item, 1/3 on second, 1/3 ok).
         # assert current_rev.id
@@ -412,7 +420,6 @@ class Revisioner(MapperExtension):
         assert current_rev.id
         instance.revision_id = current_rev.id
         instance.revision = current_rev
-        # also set this so that we flush
 
     def check_real_change(self, instance, mapper):
         logger.debug('check_real_change: %s' % instance)
@@ -445,7 +452,7 @@ class Revisioner(MapperExtension):
 
     def make_revision(self, instance, mapper):
         # NO GOOD working with the object as that only gets committed at next
-        # flush. Need to work with the table directly (could this be dangerous)
+        # flush. Need to work with the table directly
         colvalues = {}
         table = mapper.tables[0]
         for key in table.c.keys():
@@ -484,33 +491,38 @@ class Revisioner(MapperExtension):
         # object_session(instance).revision = None
 
     def before_update(self, mapper, connection, instance):
-        logger.debug('before_update: %s' % instance)
-        self.set_revision(instance)
-        self._is_changed = self.check_real_change(instance, mapper)
+        if not self.revisioning_disabled(instance):
+            logger.debug('before_update: %s' % instance)
+            self.set_revision(instance)
+            self._is_changed = self.check_real_change(instance, mapper)
         return EXT_CONTINUE
 
     def before_insert(self, mapper, connection, instance):
-        logger.debug('before_insert: %s' % instance)
-        # TODO: explain why we cannot do everything here
-        # i.e. why do we need to run stuff in after_update
-        self.set_revision(instance)
-        self._is_changed = self.check_real_change(instance, mapper)
+        if not self.revisioning_disabled(instance):
+            logger.debug('before_insert: %s' % instance)
+            # TODO: explain why we cannot do everything here
+            # i.e. why do we need to run stuff in after_update
+            self.set_revision(instance)
+            self._is_changed = self.check_real_change(instance, mapper)
         return EXT_CONTINUE
 
     def after_update(self, mapper, connection, instance):
-        logger.debug('after_update: %s' % instance)
-        if self._is_changed:
-            self.make_revision(instance, mapper)
+        if not self.revisioning_disabled(instance):
+            logger.debug('after_update: %s' % instance)
+            if self._is_changed:
+                self.make_revision(instance, mapper)
         return EXT_CONTINUE
 
     def after_insert(self, mapper, connection, instance):
-        logger.debug('after_insert: %s' % instance)
-        if self._is_changed:
-            self.make_revision(instance, mapper)
+        if not self.revisioning_disabled(instance):
+            logger.debug('after_insert: %s' % instance)
+            if self._is_changed:
+                self.make_revision(instance, mapper)
         return EXT_CONTINUE
 
     def append_result(self, mapper, selectcontext, row, instance, result,
              **flags):
+        # TODO: 2009-02-13 why is this needed? Can we remove this?
         logger.debug('append_result: %s' % instance)
         return EXT_CONTINUE
 
