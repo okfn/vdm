@@ -81,12 +81,9 @@ class Package(vdm.sqlalchemy.RevisionedObjectMixin,
     def __repr__(self):
         return '<Package %s>' % self.name
 
-class Tag(object):
+class Tag(vdm.sqlalchemy.SQLAlchemyMixin):
     def __init__(self, name):
         self.name = name
-
-    def __repr__(self):
-        return '<Tag %s>' % self.name
 
 class PackageTag(vdm.sqlalchemy.RevisionedObjectMixin,
         vdm.sqlalchemy.StatefulObjectMixin):
