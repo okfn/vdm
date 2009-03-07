@@ -68,12 +68,11 @@ class Repository(object):
     def rebuild_db(self):
         logger.info('Rebuilding DB')
         self.clean_db()
-        self.create_db()
         self.init_db()
 
     def init_db(self):
-        logger.info('Initing DB') 
         self.create_db()
+        logger.info('Initing DB') 
         states = State.query.all()
         if len(states) == 0:
             ACTIVE = State(id=1, name='active').name

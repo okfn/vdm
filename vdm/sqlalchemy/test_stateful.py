@@ -29,11 +29,10 @@ def is_active(st):
 
 
 class TestStatefulList:
+    active = ACTIVE
+    deleted = DELETED
 
     def setup_method(self, name=''):
-        self.active = ACTIVE
-        self.deleted = DELETED
-
         self.sb = Stateful('b', state=self.deleted)
         self.baselist = [
                 Stateful('a'),
@@ -99,6 +98,14 @@ class TestStatefulList:
         # self.slist.append(self.sc)
         # assert len(self.baselist) == 4
         # assert len(self.slist) == 4
+
+    def _test_insert(self):
+        # TODO: get this working
+        self.slist.insert(0, self.sb)
+        assert len(self.baselist) == 4
+        assert len(self.slist) == 3
+        # TODO:
+        pass
 
     def test_delete(self):
         del self.slist[0]

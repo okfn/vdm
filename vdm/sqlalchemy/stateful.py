@@ -321,7 +321,7 @@ def make_m2m_creator_for_assocproxy(m2m_object, attrname):
     @param attrname: the attrname to use for the default object passed in to m2m
     '''
     # TODO: 2009-02-17 as yet no *positive* test of this functionality
-    # TODO: is it even needed
+    # TODO: is it even needed?
     def has_existing(mykwargs):
         # first try to retrieve on basis of mykwargs
         q = m2m_object.query
@@ -343,7 +343,8 @@ def make_m2m_creator_for_assocproxy(m2m_object, attrname):
     def create_m2m(foreign, **kw):
         mykwargs = dict(kw)
         mykwargs[attrname] = foreign
-        existing = has_existing(mykwargs)
+        # existing = has_existing(mykwargs)
+        existing = None
         if existing:
             return existing
         else:
