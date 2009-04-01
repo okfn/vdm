@@ -1,18 +1,37 @@
+import logging
+# logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('vdm')
+
 from sqlalchemy.orm import object_session, class_mapper
 
 import vdm.sqlalchemy
 from demo import *
 
-import logging
-logging.basicConfig(level=logging.DEBUG)
-# logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('vdm')
-
 from tools import Repository
 repo = Repository(metadata, Session,
-        versioned_objects = [ Package, License,  PackageTag ])
+        versioned_objects = [ Package, License,  PackageTag ]
+        )
 ACTIVE = 'active'
 DELETED = 'deleted'
+
+
+class TestSqlalchemySession:
+    def test_1(self):
+        assert not hasattr(Session, 'revision')
+        assert vdm.sqlalchemy.SqlalchemySession.at_HEAD(Session)
+        rev = Revision()
+        vdm.sqlalchemy.set_revision(Session, rev)
+        assert vdm.sqlalchemy.SqlalchemySession.at_HEAD(Session)
+        assert Session.revision is not None
+        out = vdm.sqlalchemy.get_revision(Session)
+        assert out == rev
+        out = vdm.sqlalchemy.get_revision(Session())
+        assert out == rev
+        assert vdm.sqlalchemy.SqlalchemySession.at_HEAD(Session)
+        assert vdm.sqlalchemy.SqlalchemySession.at_HEAD(Session())
+        Session.remove()
+
 
 class TestVersioning:
 
@@ -32,8 +51,6 @@ class TestVersioning:
         lic1 = License(name='blah', open=True)
         p1 = Package(name=self.name1, title=self.title1, license=lic1)
         p2 = Package(name=self.name2, title=self.title1, license=lic1)
-        # t1 = Tag(name='geo')
-        # p1.tags = [t1]
 
         logger.debug('***** Committing/Flushing Rev 1')
         session.commit()
@@ -52,7 +69,6 @@ class TestVersioning:
         outp1 = Package.query.filter_by(name=self.name1).one()
         outp2 = Package.query.filter_by(name=self.name2).one()
         outp1.title = self.title2
-        # outp1.tags = []
         t1 = Tag(name='geo')
         outp1.tags = [t1]
         outp2.delete()
@@ -64,7 +80,7 @@ class TestVersioning:
 
     def teardown_class(self):
         Session.remove()
-        
+
     def test_revisions_exist(self):
         revs = Revision.query.all()
         assert len(revs) == 2
@@ -146,20 +162,23 @@ class TestVersioning:
         rev1 = Revision.query.get(self.rev1_id)
         p1r1 = p1.get_as_of(rev1)
         assert len(p1.tags_active) == 0
+        # NB: deleted includes tags that were non-existent
         assert len(p1.tags_deleted) == 1
         assert len(p1.tags) == 0
         assert len(p1r1.tags) == 0
-       
-class TestVersioning2:
+    
+    def test_revision_has_state(self):
+        rev1 = Revision.query.get(self.rev1_id)
+        assert rev1.state.name == ACTIVE
 
+
+class TestStatefulVersioned:
     @classmethod
     def setup_class(self):
         repo.rebuild_db()
-        logger.debug('====== TestVersioning2: start')
+        logger.info('====== TestVersioning2: start')
 
-        rev1 = Revision() 
-        vdm.sqlalchemy.set_revision(Session, rev1)
-        
+        rev1 = repo.new_revision()
         self.name1 = 'anna'
         p1 = Package(name=self.name1)
         t1 = Tag(name='geo')
@@ -167,23 +186,86 @@ class TestVersioning2:
         p1.tags.append(t1)
         p1.tags.append(t2)
         Session.commit()
-    
-        # can only get it after the flush
         self.rev1_id = rev1.id
         Session.remove()
 
-        # rev2 = Revision() 
-        # vdm.sqlalchemy.set_revision(Session, rev2)
+        logger.debug('====== start Revision 2')
+        rev2 = repo.new_revision()
+        newp1 = Package.query.filter_by(name=self.name1).one()
+        # newp1.tags = []
+        newp1.tags_active.clear()
+        assert len(newp1.tags_active) == 0
+        Session.commit()
+        logger.info('TAGS_ACTIVE: %s' % newp1.tags_active)
+        logger.info('PACKAGE TAGS: %s' % newp1.package_tags)
+        self.rev2_id = rev2.id
+        Session.remove()
 
-    def test_basics(self):
-        # rev1 = Revision.query.get(self.rev1_id)
+        logger.debug('====== start Revision 3')
+        rev3 = repo.new_revision()
+        newp1 = Package.query.filter_by(name=self.name1).first()
+        self.tagname1 = 'geo'
+        t1 = Tag.query.filter_by(name=self.tagname1).first()
+        assert t1
+        newp1.tags.append(t1)
+        repo.commit_and_remove()
+
+    @classmethod
+    def teardown_class(self):
+        Session.remove()
+
+    def test_remove_and_readd_m2m(self):
         p1 = Package.query.filter_by(name=self.name1).one()
-        print p1.tags
-        assert len(p1.tags) == 2
+        assert len(p1.package_tags) == 3
+        assert len(p1.tags_active) == 1
+        assert len(p1.tags) == 1
+        Session.remove()
 
-    def test_revision_has_state(self):
+    def test_underlying_is_right(self):
         rev1 = Revision.query.get(self.rev1_id)
-        assert rev1.state.name == ACTIVE
+        ptrevs = PackageTagRevision.query.filter_by(revision_id=rev1.id).all()
+        assert len(ptrevs) == 2
+        for pt in ptrevs:
+            assert pt.state.name == ACTIVE
+
+        rev2 = Revision.query.get(self.rev2_id)
+        ptrevs = PackageTagRevision.query.filter_by(revision_id=rev2.id).all()
+        assert len(ptrevs) == 2
+        for pt in ptrevs:
+            assert pt.state.name == DELETED
+    
+    # test should be higher up but need at least 3 revisions for problem to
+    # show up
+    def test_get_as_of(self):
+        p1 = Package.query.filter_by(name=self.name1).one()
+        rev2 = Revision.query.get(self.rev2_id)
+        # should be 2 deleted and 1 as None
+        ptrevs = [ pt.get_as_of(rev2) for pt in p1.package_tags ]
+        print ptrevs
+        print PackageTagRevision.query.all()
+        assert ptrevs[0].revision_id == rev2.id
+
+    def test_remove_and_readd_m2m_2(self):
+        # should be 2 ...
+        # NB: all these relations on revision object proxy to continuity
+        # (though with get_as_of revision set)
+        num_package_tags = 3
+        rev1 = Revision.query.get(self.rev1_id)
+        p1 = Package.query.filter_by(name=self.name1).one()
+        p1rev = p1.get_as_of(rev1)
+        assert len(p1rev.package_tags) == num_package_tags
+        assert len(p1rev.tags) == 2
+        Session.remove()
+
+        rev2 = Revision.query.get(self.rev2_id)
+        p1 = Package.query.filter_by(name=self.name1).one()
+        p2rev = p1.get_as_of(rev2)
+        assert p2rev.__class__ == PackageRevision
+        assert len(p2rev.package_tags) == num_package_tags
+        print rev2.id
+        print p2rev.tags_active
+        assert len(p2rev.tags) == 0
+
 
 class TestRevertAndPurge:
 
@@ -212,7 +294,7 @@ class TestRevertAndPurge:
 
     @classmethod
     def teardown_class(self):
-        pass
+        repo.rebuild_db()
 
     def test_basics(self):
         revs = Revision.query.all()

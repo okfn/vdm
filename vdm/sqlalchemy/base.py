@@ -19,24 +19,47 @@ class SQLAlchemyMixin(object):
         return self.__str__()
 
 ## -------------------------------------
+class SqlalchemySession(object):
+    '''Do stuff with the sqlalchemy session.'''
 
-# make explicit to avoid errors from typos (no attribute defns in python!)
-def set_revision(session, revision):
-    session.revision = revision
-    # check if we are being given the Session class (threadlocal case)
-    # if so set on both class and instance
-    # this is important because sqlalchemy's object_session (used below) seems
-    # to return a Session() not Session
-    if isinstance(session, sqlalchemy.orm.scoping.ScopedSession):
-        sess = session()
-        sess.revision = revision
+    @classmethod
+    def set_attr(self, session, attr, value):
+        setattr(session, attr, value)
+        # check if we are being given the Session class (threadlocal case)
+        # if so set on both class and instance
+        # this is important because sqlalchemy's object_session (used below) seems
+        # to return a Session() not Session
+        if isinstance(session, sqlalchemy.orm.scoping.ScopedSession):
+            sess = session()
+            setattr(sess, attr, value)
 
-def get_revision(session):
-    '''Get revision on current Session/session.
-    
-    NB: will return None if not set
-    '''
-    return getattr(session, 'revision', None)
+    # make explicit to avoid errors from typos (no attribute defns in python!)
+    @classmethod
+    def set_revision(self, session, revision):
+        self.set_attr(session, 'HEAD', True)
+        self.set_attr(session, 'revision', revision)
+
+    @classmethod
+    def get_revision(self, session):
+        '''Get revision on current Session/session.
+        
+        NB: will return None if not set
+        '''
+        return getattr(session, 'revision', None)
+
+    @classmethod
+    def set_not_at_HEAD(self, session):
+        self.set_attr(session, 'HEAD', False)
+
+    @classmethod
+    def at_HEAD(self, session):
+        return getattr(session, 'HEAD', True)
+
+def set_revision(sess, revision):
+    SqlalchemySession.set_revision(sess, revision)
+
+def get_revision(sess):
+    return SqlalchemySession.get_revision(sess)
 
 ## --------------------------------------------------------
 ## VDM-Specific Domain Objects and Tables
@@ -209,7 +232,7 @@ class StatefulObjectMixin(object):
     def delete(self):
         # HACK: how do we get the real value without having State object
         # available ...
-        logger.debug('RUNNING delete on %s' % self)
+        logger.debug('Running delete on %s' % self)
         deleted = self.state_obj.query.filter_by(name='deleted').one()
         self.state = deleted
     
@@ -227,20 +250,6 @@ class RevisionedObjectMixin(object):
 
     __revisioned__ = True
 
-    def _get_revision(self):
-        sess = object_session(self)
-        rev = get_revision(sess)
-        return rev
-
-    def _set_revision(self, revision):
-        # rev = self._get_revision()
-        # if not rev or rev != revision:
-        #     msg = 'The revision on the session does not match the one you' + \
-        #     'requesting.'
-        #     raise Exception(msg)
-        sess = object_session(self)
-        set_revision(sess, revision)
-
     def get_as_of(self, revision=None):
         '''Get this domain object at the specified revision.
         
@@ -250,30 +259,37 @@ class RevisionedObjectMixin(object):
         get_as_of does most of the crucial work in supporting the
         versioning.
         '''
-        if revision:
-            # set revision on the session so dom traversal works
-            # TODO: should we assert revision.id?
-            self._set_revision(revision)
+        sess = object_session(self)
+        if revision: # set revision on the session so dom traversal works
+            # TODO: should we test for overwriting current session?
+            # if rev != revision:
+            #     msg = 'The revision on the session does not match the one you' + \
+            #     'requesting.'
+            #     raise Exception(msg)
+            logger.debug('get_as_of: setting revision and not_as_HEAD: %s' %
+                    revision)
+            SqlalchemySession.set_revision(sess, revision)
+            SqlalchemySession.set_not_at_HEAD(sess)
         else:
-            revision = self._get_revision()
-        # if revision is None or does not have an id (implies in transaction)
-        # then we should use head (i.e. continuity object since this caches
-        # head)
-        at_head = (revision is None or revision.id is None)
-        if at_head:
+            revision = get_revision(sess)
+
+        if SqlalchemySession.at_HEAD(sess):
             return self
         else:
             revision_class = self.__revision_class__
-            # exploit orderings of ids
-            out = revision_class.query.filter(
+            # TODO: when dealing with multi-col pks will need to update this
+            # (or just use continuity)
+            out = revision_class.query.\
+                filter(
                     revision_class.revision_id <= revision.id
-                    ).filter(
-                        revision_class.id == self.id
-                        )
-            if out.count() == 0: # object does not exist yet
-                return None
-            else:
-                return out.first()
+                ).\
+                filter(
+                    revision_class.id == self.id
+                ).\
+                order_by(
+                    revision_class.c.revision_id.desc()
+                )
+            return out.first()
 
 ## --------------------------------------------------------
 ## Mapper Helpers
@@ -319,8 +335,15 @@ def create_object_version(mapper_fn, base_object, rev_table):
         })
     base_mapper = class_mapper(base_object)
     # add in 'relationship' stuff from continuity onto revisioned obj
-    # If related object is revisioned then ok
-    # If not can support simple relation but nothing else
+    # 3 types of relationship
+    # 1. scalar (i.e. simple fk)
+    # 2. list (has many) (simple fk the other way)
+    # 3. list (m2m) (join table)
+    # 
+    # Also need to check whether related object is revisioned
+    # 
+    # If related object is revisioned then can do all of these
+    # If not revisioned can only support simple relation (first case -- why?)
     for prop in base_mapper.iterate_properties:
         is_relation = prop.__class__ == sqlalchemy.orm.properties.PropertyLoader
         if is_relation:
@@ -330,27 +353,36 @@ def create_object_version(mapper_fn, base_object, rev_table):
             prop_remote_obj = prop.argument
             remote_obj_is_revisioned = getattr(prop_remote_obj, '__revisioned__', False)
             # this is crude, probably need something better
-            is_m2m = (prop.secondary != None or prop.uselist)
+            is_many = (prop.secondary != None or prop.uselist)
             if remote_obj_is_revisioned:
                 propname = prop.key
-                add_fake_relation(MyClass, propname)
-            elif not is_m2m:
-                # import pprint
-                # if prop.key == 'tags':
-                #    pprint.pprint(prop.__dict__)
+                add_fake_relation(MyClass, propname, is_many=is_many)
+            elif not is_many:
                 ourmapper.add_property(prop.key, relation(prop_remote_obj))
             else:
-                # TODO: ? raise a warning of some kind ...
-                pass
+                # TODO: actually deal with this
+                # raise a warning of some kind
+                msg = 'Skipping adding property %s to revisioned object' % prop 
+                logger.warn(msg)
 
     return MyClass
 
-def add_fake_relation(revision_class, name, m2m=False): 
+def add_fake_relation(revision_class, name, is_many=False): 
+    '''Add a 'fake' relation on ObjectRevision objects.
+    
+    These relation are fake in that they just proxy to the continuity object
+    relation.
+    '''
     def _pget(self):
         related_object = getattr(self.continuity, name)
-        # will use whatever the current session.revision is
-        if m2m:
-            # with m2m get_as_of already implemented inside the m2m relation
+        if is_many:
+            # do not need to do anything to get to right revision since either
+            # 1. this is implemented inside the is_many relation we proxy to
+            # (as is the case with StatefulLists and assoc proxy setup as used
+            # in add_stateful_versioned_m2m)
+            # 2. it is not because it is not appropriate to apply it
+            # (e.g. package.package_tags which points to PackageTag objects and
+            # which is not versioned here ...)
             return related_object
         else:
             return related_object.get_as_of()
@@ -371,11 +403,12 @@ def add_stateful_versioned_m2m(*args, **kwargs):
     add_stateful_m2m(*args, **newkwargs)
 
 def add_stateful_versioned_m2m_on_version(revision_class, m2m_property_name):
+    # just add these m2m properties to version
     active_name = m2m_property_name + '_active'
     deleted_name = m2m_property_name + '_deleted'
     for propname in [active_name, deleted_name, m2m_property_name]:
         add_fake_relation(revision_class, propname,
-                m2m=True)
+                is_many=True)
 
 
 from sqlalchemy.orm import MapperExtension
@@ -477,8 +510,6 @@ class Revisioner(MapperExtension):
 
         if revision_already:
             logging.debug('Updating version of %s: %s' % (instance, colvalues))
-            # print self.revision_table.c.keys()
-            # print self.revision_table.select().execute().fetchall()
             self.revision_table.update(existing_revision_clause).execute(colvalues)
         else:
             logging.debug('Creating version of %s: %s' % (instance, colvalues))
@@ -523,8 +554,5 @@ class Revisioner(MapperExtension):
     def append_result(self, mapper, selectcontext, row, instance, result,
              **flags):
         # TODO: 2009-02-13 why is this needed? Can we remove this?
-        logger.debug('append_result: %s' % instance)
         return EXT_CONTINUE
-
-
 

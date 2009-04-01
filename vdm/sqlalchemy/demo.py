@@ -73,20 +73,24 @@ class License(vdm.sqlalchemy.RevisionedObjectMixin):
             setattr(self, k, v)
 
 class Package(vdm.sqlalchemy.RevisionedObjectMixin,
-        vdm.sqlalchemy.StatefulObjectMixin):
+        vdm.sqlalchemy.StatefulObjectMixin,
+        vdm.sqlalchemy.SQLAlchemyMixin
+        ):
+
     def __init__(self, **kwargs):
         for k,v in kwargs.items():
             setattr(self, k, v)
 
-    def __repr__(self):
-        return '<Package %s>' % self.name
 
 class Tag(vdm.sqlalchemy.SQLAlchemyMixin):
     def __init__(self, name):
         self.name = name
 
+
 class PackageTag(vdm.sqlalchemy.RevisionedObjectMixin,
-        vdm.sqlalchemy.StatefulObjectMixin):
+        vdm.sqlalchemy.StatefulObjectMixin,
+        vdm.sqlalchemy.SQLAlchemyMixin
+        ):
     def __init__(self, package=None, tag=None, state=None, **kwargs):
         logger.debug('PackageTag.__init__: %s, %s' % (package, tag))
         self.package = package
@@ -94,9 +98,6 @@ class PackageTag(vdm.sqlalchemy.RevisionedObjectMixin,
         self.state = state
         for k,v in kwargs.items():
             setattr(self, k, v)
-
-    def __repr__(self):
-        return '<PackageTag %s %s>' % (self.package, self.tag)
 
 
 ## --------------------------------------------------------

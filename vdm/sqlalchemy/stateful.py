@@ -4,7 +4,7 @@ TODO: create some proper tests for base_modifier stuff.
 TODO: move stateful material from base.py here?
 '''
 import logging
-logger = logging.getLogger('vdm')
+logger = logging.getLogger('vdm.stateful')
 
 import itertools
 
@@ -14,7 +14,10 @@ class StatefulList(object):
     'active' state.
 
     What behaviour do we expect when adding an object already in the list to
-    the list? Either:
+    the list? Note that when we say an object already in the list we mean
+    identical as determined by python 'in' function. This means, for example
+    that 2 objects which have different state attributes will not (usually) be
+    considered the same.
 
     1. Ensure only one active object in the list at a time. So:
         * if object is already active raise Exception
@@ -40,8 +43,20 @@ class StatefulList(object):
 
         base_modifier: function to operate on base objects before any
             processing. e.g. could have function:
+
             def get_as_of(x):
                 return x.get_as_of(revision)
+
+            WARNING: when using base_modifier the objects returned from this list will
+            not be list objects themselves but base_modifier(object).
+            In particular, this means that when base_modifier is turned on
+            operations that change the list (e.g. deletions) will operate on
+            modified objects not the base objects!!
+
+        # TODO: not clear what happens if we have 'same' object in different
+        # states i.e. i re-add the same object but with a different state then
+        # ends up with two different object in the system which is maybe not
+        # what we want ... (this needs some careful checking)
         '''
         self.baselist = target_list 
 
@@ -49,7 +64,7 @@ class StatefulList(object):
         for argname in extra_args:
             setattr(self, argname, kwargs.get(argname, None))
         if self.is_active is None:
-            # object may not exist (e.g. with get_as_of0 in which case it will
+            # object may not exist (e.g. with get_as_of in which case it will
             # be None
             self.is_active = lambda x: not(x is None) and x.is_active()
         if self.delete is None:
@@ -88,11 +103,6 @@ class StatefulList(object):
         raise IndexError
 
     def append(self, obj):
-        # TODO: use base_modifier
-        # TODO: not clear what happens if we have 'same' object in different
-        # states i.e. i re-add the same object but with a different state then
-        # ends up with two different object in the system which is maybe not
-        # what we want ... (this needs some careful checking)
         if obj in self.baselist:
             if self._is_active(obj):
                 # assume unique items in list o/w not meaningful
@@ -225,8 +235,8 @@ class StatefulListProperty(object):
             return stateful_list
 
     def __set__(self, obj, values):
-        # TODO: assign to whole underlying mapper
-        raise NotImplementedException()
+        # TODO: assign to underlying stateful list
+        raise NotImplementedError()
 
 
 import sqlalchemy.ext.associationproxy
@@ -282,6 +292,8 @@ def add_stateful_m2m(object_to_alter, m2m_object, m2m_property_name,
     
     there will be additional properties:
 
+        # NB: licenses_active and licenses_deleted are lists of PackageLicense
+        # objects while licenses (being an assoc proxy) is a list of Licenses
         licenses_active # these are active PackageLicenses
         licenses_deleted # these are deleted PackageLicenses
         licenses # these are active *Licenses*
