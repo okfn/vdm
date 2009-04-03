@@ -3,27 +3,18 @@ from datetime import datetime
 import logging
 logger = logging.getLogger('vdm')
 
-## -------------------------------------
-## Really Generic Stuff
-
-class SQLAlchemyMixin(object):
-    def __str__(self):
-        repr = u'<%s' % self.__class__.__name__
-        table = sqlalchemy.orm.class_mapper(self.__class__).mapped_table
-        for col in table.c:
-            repr += u' %s=%s' % (col.name, getattr(self, col.name))
-        repr += '>'
-        return repr
-
-    def __repr__(self):
-        return self.__str__()
+from sqla import SQLAlchemyMixin
 
 ## -------------------------------------
-class SqlalchemySession(object):
-    '''Do stuff with the sqlalchemy session.'''
+class SQLAlchemySession(object):
+    '''Handle setting/getting attributes on the SQLAlchemy session.
+    
+    TODO: update all methods so they can take an object as well as session
+    object.
+    '''
 
     @classmethod
-    def set_attr(self, session, attr, value):
+    def setattr(self, session, attr, value):
         setattr(session, attr, value)
         # check if we are being given the Session class (threadlocal case)
         # if so set on both class and instance
@@ -33,11 +24,15 @@ class SqlalchemySession(object):
             sess = session()
             setattr(sess, attr, value)
 
+    @classmethod
+    def getattr(self, session, attr):
+        return getattr(session, attr)
+
     # make explicit to avoid errors from typos (no attribute defns in python!)
     @classmethod
     def set_revision(self, session, revision):
-        self.set_attr(session, 'HEAD', True)
-        self.set_attr(session, 'revision', revision)
+        self.setattr(session, 'HEAD', True)
+        self.setattr(session, 'revision', revision)
 
     @classmethod
     def get_revision(self, session):
@@ -49,17 +44,18 @@ class SqlalchemySession(object):
 
     @classmethod
     def set_not_at_HEAD(self, session):
-        self.set_attr(session, 'HEAD', False)
+        self.setattr(session, 'HEAD', False)
 
     @classmethod
     def at_HEAD(self, session):
         return getattr(session, 'HEAD', True)
 
 def set_revision(sess, revision):
-    SqlalchemySession.set_revision(sess, revision)
+    raise NotImplementedError('This method is deprecated. Use SQLAlchemySession.set_revision')
 
 def get_revision(sess):
-    return SqlalchemySession.get_revision(sess)
+    raise NotImplementedError('This method is deprecated. Use SQLAlchemySession.get_revision')
+
 
 ## --------------------------------------------------------
 ## VDM-Specific Domain Objects and Tables
@@ -268,12 +264,12 @@ class RevisionedObjectMixin(object):
             #     raise Exception(msg)
             logger.debug('get_as_of: setting revision and not_as_HEAD: %s' %
                     revision)
-            SqlalchemySession.set_revision(sess, revision)
-            SqlalchemySession.set_not_at_HEAD(sess)
+            SQLAlchemySession.set_revision(sess, revision)
+            SQLAlchemySession.set_not_at_HEAD(sess)
         else:
-            revision = get_revision(sess)
+            revision = SQLAlchemySession.get_revision(sess)
 
-        if SqlalchemySession.at_HEAD(sess):
+        if SQLAlchemySession.at_HEAD(sess):
             return self
         else:
             revision_class = self.__revision_class__
@@ -416,7 +412,13 @@ from sqlalchemy.orm import object_session
 from sqlalchemy.orm import EXT_CONTINUE
 
 class Revisioner(MapperExtension):
-    # TODO: support ignored fields and check we really have changed ..
+    '''Revision revisioned objects.
+    
+    In essence we are implementing copy on write.
+
+    However: we need to be a bit careful to ignore non-versioned attributes
+    etc.
+    '''
 
     def __init__(self, revision_table):
         self.revision_table = revision_table
@@ -429,7 +431,7 @@ class Revisioner(MapperExtension):
 
     def set_revision(self, instance):
         sess = object_session(instance)
-        current_rev = get_revision(sess) 
+        current_rev = SQLAlchemySession.get_revision(sess) 
         # was using revision_id but this led to weird intermittent erros
         # (1/3: fail on first item, 1/3 on second, 1/3 ok).
         # assert current_rev.id
@@ -462,7 +464,7 @@ class Revisioner(MapperExtension):
         ctyval = getattr(instance, colname)
         values = table.select(ctycol==ctyval).execute().fetchone() 
         if values is None: # object not yet created
-            logging.debug('check_real_change: True')
+            logger.debug('check_real_change: True')
             return True
         ignored = [ 'revision_id' ]
 
@@ -475,12 +477,11 @@ class Revisioner(MapperExtension):
         for key in table.c.keys():
             if key in ignored:
                 continue
-            # logger.debug('%s, %s, %s' % (key, getattr(instance, key), values[key]))
             if getattr(instance, key) != values[key]:
                 # the instance was really updated, so we create a new version
-                logging.debug('check_real_change: True')
+                logger.debug('check_real_change: True')
                 return True
-        logging.debug('check_real_change: False')
+        logger.debug('check_real_change: False')
         return False
 
     def make_revision(self, instance, mapper):
@@ -509,10 +510,10 @@ class Revisioner(MapperExtension):
         revision_already = num_revisions > 0
 
         if revision_already:
-            logging.debug('Updating version of %s: %s' % (instance, colvalues))
+            logger.debug('Updating version of %s: %s' % (instance, colvalues))
             self.revision_table.update(existing_revision_clause).execute(colvalues)
         else:
-            logging.debug('Creating version of %s: %s' % (instance, colvalues))
+            logger.debug('Creating version of %s: %s' % (instance, colvalues))
             self.revision_table.insert().execute(colvalues)
 
         # set to None to avoid accidental reuse
@@ -522,33 +523,32 @@ class Revisioner(MapperExtension):
         # object_session(instance).revision = None
 
     def before_update(self, mapper, connection, instance):
-        if not self.revisioning_disabled(instance):
+        self._is_changed = self.check_real_change(instance, mapper)
+        if not self.revisioning_disabled(instance) and self._is_changed:
             logger.debug('before_update: %s' % instance)
             self.set_revision(instance)
             self._is_changed = self.check_real_change(instance, mapper)
         return EXT_CONTINUE
 
+    # TODO: explain why we cannot do everything here
+    # i.e. why do we need to run stuff in after_update
     def before_insert(self, mapper, connection, instance):
-        if not self.revisioning_disabled(instance):
+        self._is_changed = self.check_real_change(instance, mapper)
+        if not self.revisioning_disabled(instance) and self._is_changed:
             logger.debug('before_insert: %s' % instance)
-            # TODO: explain why we cannot do everything here
-            # i.e. why do we need to run stuff in after_update
             self.set_revision(instance)
-            self._is_changed = self.check_real_change(instance, mapper)
         return EXT_CONTINUE
 
     def after_update(self, mapper, connection, instance):
-        if not self.revisioning_disabled(instance):
+        if not self.revisioning_disabled(instance) and self._is_changed:
             logger.debug('after_update: %s' % instance)
-            if self._is_changed:
-                self.make_revision(instance, mapper)
+            self.make_revision(instance, mapper)
         return EXT_CONTINUE
 
     def after_insert(self, mapper, connection, instance):
-        if not self.revisioning_disabled(instance):
+        if not self.revisioning_disabled(instance) and self._is_changed:
             logger.debug('after_insert: %s' % instance)
-            if self._is_changed:
-                self.make_revision(instance, mapper)
+            self.make_revision(instance, mapper)
         return EXT_CONTINUE
 
     def append_result(self, mapper, selectcontext, row, instance, result,

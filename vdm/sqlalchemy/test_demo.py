@@ -16,20 +16,20 @@ ACTIVE = 'active'
 DELETED = 'deleted'
 
 
-class TestSqlalchemySession:
+class TestSQLAlchemySession:
     def test_1(self):
         assert not hasattr(Session, 'revision')
-        assert vdm.sqlalchemy.SqlalchemySession.at_HEAD(Session)
+        assert vdm.sqlalchemy.SQLAlchemySession.at_HEAD(Session)
         rev = Revision()
-        vdm.sqlalchemy.set_revision(Session, rev)
-        assert vdm.sqlalchemy.SqlalchemySession.at_HEAD(Session)
+        vdm.sqlalchemy.SQLAlchemySession.set_revision(Session, rev)
+        assert vdm.sqlalchemy.SQLAlchemySession.at_HEAD(Session)
         assert Session.revision is not None
-        out = vdm.sqlalchemy.get_revision(Session)
+        out = vdm.sqlalchemy.SQLAlchemySession.get_revision(Session)
         assert out == rev
-        out = vdm.sqlalchemy.get_revision(Session())
+        out = vdm.sqlalchemy.SQLAlchemySession.get_revision(Session())
         assert out == rev
-        assert vdm.sqlalchemy.SqlalchemySession.at_HEAD(Session)
-        assert vdm.sqlalchemy.SqlalchemySession.at_HEAD(Session())
+        assert vdm.sqlalchemy.SQLAlchemySession.at_HEAD(Session)
+        assert vdm.sqlalchemy.SQLAlchemySession.at_HEAD(Session())
         Session.remove()
 
 
@@ -42,7 +42,7 @@ class TestVersioning:
         logger.debug('===== STARTING REV 1')
         session = Session()
         rev1 = Revision() 
-        vdm.sqlalchemy.set_revision(session, rev1)
+        vdm.sqlalchemy.SQLAlchemySession.set_revision(session, rev1)
 
         self.name1 = 'anna'
         self.name2 = 'warandpeace'
@@ -63,7 +63,7 @@ class TestVersioning:
         session = Session()
         session.begin()
         rev2 = Revision()
-        vdm.sqlalchemy.set_revision(session, rev2)
+        vdm.sqlalchemy.SQLAlchemySession.set_revision(session, rev2)
         outlic1 = License.query.filter_by(name='blah').first()
         outlic1.open = False
         outp1 = Package.query.filter_by(name=self.name1).one()
@@ -275,7 +275,7 @@ class TestRevertAndPurge:
         repo.rebuild_db()
 
         rev1 = Revision() 
-        vdm.sqlalchemy.set_revision(Session, rev1)
+        vdm.sqlalchemy.SQLAlchemySession.set_revision(Session, rev1)
         
         self.name1 = 'anna'
         p1 = Package(name=self.name1)
@@ -294,6 +294,7 @@ class TestRevertAndPurge:
 
     @classmethod
     def teardown_class(self):
+        Session.remove()
         repo.rebuild_db()
 
     def test_basics(self):

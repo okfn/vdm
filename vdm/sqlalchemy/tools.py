@@ -25,7 +25,7 @@ from sqlalchemy.orm import ScopedSession
 from sqlalchemy.orm import class_mapper
 from sqlalchemy.orm import object_session
 
-from base import set_revision, State, Revision
+from base import SQLAlchemySession, State, Revision
 
 class Repository(object):
     '''Manage repository-wide type changes for versioned domain models.
@@ -83,7 +83,7 @@ class Repository(object):
     def new_revision(self):                                   
         '''Convenience method to create new revision and set it on session.'''
         rev = Revision()                                      
-        set_revision(self.session, rev)             
+        SQLAlchemySession.set_revision(self.session, rev)             
         return rev
         
     def commit(self):
@@ -106,7 +106,7 @@ class Repository(object):
     
     def new_revision(self):
         rev = Revision()
-        set_revision(self.session, rev)
+        SQLAlchemySession.set_revision(self.session, rev)
         return rev
 
     def list_changes(self, revision):
@@ -143,10 +143,7 @@ class Repository(object):
         '''
         logger.debug('Purging revision: %s' % revision.id)
         to_purge = []
-        # have to set on both instance and ScopedSession
-        # see comments in base.set_revision
-        self.session.revisioning_disabled = True 
-        self.session().revisioning_disabled = True 
+        SQLAlchemySession.setattr(self.session, 'revisioning_disabled', True)
         for o in self.versioned_objects:
             revobj = o.__revision_class__
             items = revobj.query.filter_by(revision=revision).all()
