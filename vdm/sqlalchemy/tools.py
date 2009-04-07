@@ -81,7 +81,13 @@ class Repository(object):
         self.session.remove()
 
     def new_revision(self):                                   
-        '''Convenience method to create new revision and set it on session.'''
+        '''Convenience method to create new revision and set it on session.
+        
+        NB: if in transactional mode do *not* need to call `begin` as we are
+        automatically within a transaction at all times if session was set up
+        as transactional (every commit is paired with a begin)
+        <http://groups.google.com/group/sqlalchemy/browse_thread/thread/a54ce150b33517db/17587ca675ab3674>
+        '''
         rev = Revision()                                      
         SQLAlchemySession.set_revision(self.session, rev)             
         return rev
@@ -108,6 +114,14 @@ class Repository(object):
         rev = Revision()
         SQLAlchemySession.set_revision(self.session, rev)
         return rev
+
+    def history(self):
+        '''Return a history of the repository as a query giving all active revisions.
+        
+        @return: sqlalchemy query object.
+        '''
+        active = State.query.filter_by(name='active').one()
+        return Revision.query.filter_by(state=active)
 
     def list_changes(self, revision):
         '''List all objects changed by this `revision`.
