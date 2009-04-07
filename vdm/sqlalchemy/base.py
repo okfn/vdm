@@ -4,6 +4,7 @@ import logging
 logger = logging.getLogger('vdm')
 
 from sqla import SQLAlchemyMixin
+from sqla import copy_column, copy_table_columns, copy_table
 
 ## -------------------------------------
 class SQLAlchemySession(object):
@@ -49,12 +50,6 @@ class SQLAlchemySession(object):
     @classmethod
     def at_HEAD(self, session):
         return getattr(session, 'HEAD', True)
-
-def set_revision(sess, revision):
-    raise NotImplementedError('This method is deprecated. Use SQLAlchemySession.set_revision')
-
-def get_revision(sess):
-    raise NotImplementedError('This method is deprecated. Use SQLAlchemySession.get_revision')
 
 
 ## --------------------------------------------------------
@@ -136,41 +131,6 @@ def make_table_stateful(base_table):
             # using StatefulObjectMixin 
             Column('state_id', Integer, ForeignKey('state.id'), default=1)
             )
-
-def copy_column(name, src_table, dest_table):
-    '''
-    Note you cannot just copy columns standalone e.g.
-
-        col = table.c['xyz']
-        col.copy()
-
-    This will only copy basic info while more complex properties (such as fks,
-    constraints) to work must be set when the Column has a parent table.
-
-    TODO: stuff other than fks (e.g. constraints such as uniqueness)
-    '''
-    col = src_table.c[name]
-    dest_table.append_column(col.copy())
-    # only get it once we have a parent table
-    newcol = dest_table.c[name]
-    if len(col.foreign_keys) > 0:
-        for fk in col.foreign_keys: 
-            newcol.append_foreign_key(fk.copy())
-
-def copy_table_columns(table):
-    # still does not work on fks because parent cannot be set
-    columns = []
-    for col in table.c:
-        newcol = col.copy() 
-        if len(col.foreign_keys) > 0:
-            for fk in col.foreign_keys: 
-                newcol.foreign_keys.add(fk.copy())
-        columns.append(newcol)
-    return columns
-
-def copy_table(table, newtable):
-    for key in table.c.keys():
-        copy_column(key, table, newtable)
 
 def make_table_revisioned(base_table):
     '''Modify base_table and create correponding revision table.
@@ -325,10 +285,15 @@ def create_object_version(mapper_fn, base_object, rev_table):
     ourmapper = mapper_fn(MyClass, rev_table, properties={
         # NB: call it all_revisions rather than just revisions because it will
         # yield all revisions not just those less than the current revision
-        'continuity':relation(base_object, backref=backref('all_revisions',
-            cascade='all, delete, delete-orphan')),
+        'continuity':relation(base_object,
+            backref=backref('all_revisions',
+                cascade='all, delete, delete-orphan'),
+                order_by=rev_table.c.revision_id.desc()
+            ),
         # 'continuity':relation(base_object),
-        })
+        },
+        order_by=[rev_table.c.continuity_id, rev_table.c.revision_id.desc()]
+        )
     base_mapper = class_mapper(base_object)
     # add in 'relationship' stuff from continuity onto revisioned obj
     # 3 types of relationship
