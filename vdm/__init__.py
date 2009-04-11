@@ -52,25 +52,33 @@ object, which will, where necessary, 'proxy' requests down to the
 
 To give a flavour of all of this here is a pseudo-code example::
 
-    # we need a session of some kind to track which objects have been changed
-    # each session then has a single revision
+    # We need a session of some kind to track which objects have been changed
+    # In SQLAlchemy can use its Session object
+    session = get_session_in_some_way()
+    
+    # Our Revision object
     rev1 = Revision(author='me')
+    # Associate revision with session
+    # Any given session will have a single associated revision
     session.revision = rev1
+    
     # Book and Author are domain objects which has been made versioned using this library
-    # typo!
+    # Note the typo!
     b1 = Book(name='warandpeace', title='War and Peacee')
     b2 = Book(name='annakarenina', title='Anna')
+    # Note the duplicate!
     b3 = Book(name='warandpeace')
     a1 = Author(name='tolstoy')
+
     # this is just shorthand for ending this revision and saving all changes
     # this may vary depending on the implementation
     rev1.commit()
     timestamp1 = rev1.timestamp
 
     # some time later
-
     rev2 = Revision(author='me')
     session.revision = rev2
+
     b1 = Book.get(name='warandpeace')
     # correct typo
     b1.title = 'War and Peace'
@@ -97,6 +105,8 @@ To see some real code in action take a look at::
 
     vdm/sqlalchemy/demo.py
     vdm/sqlalchemy/demo_test.py
+
+WARNING: the SQLObject code is no longer actively maintained.
 
     vdm/sqlobject/demo.py
     vdm/sqlobject/demo_test.py
@@ -146,31 +156,35 @@ SO = Implemented in SQLObject (no longer maintained)
 
 1. (SA,SO) CRUD for a simple versioned object (no references other than HasA)
 
-2. (SA,SO) Undelete for "
+2. (SA,SO) Many-2-Many and many-2-one relationships where one or both of the
+objects are versioned.
 
-3. (SA,SO) Purge for "
+3. (SA,SO) Undelete for the above.
 
-4. (SA,SO) Many-to-Many and many-2-one relationships where one of the objects is versioned.
+4. (SA,SO) Purge for the above.
 
-5. (SA) Consistent object traversal "in the past"
+5. (SA, SO) Support for changing multiple objects in a single commit.
 
-6. Concurrency checking:
+6. (SA) Consistent object traversal both at HEAD and "in the past"
+
+7. Concurrency checking:
   1. Simultaneous edits of different parts of the domain model
-  2. Simultaneous edits of same parts of domain model
-    (conflict resolution or locking)
-    1. Alice begins a txn
-    2. Alice gets object X
-    3. Bob begins a txn
-    4. gets object X
-    5. Bob changes object X and commits
-    6. Alice changes object X and commits
-      !!!!!!
-    This can be resolved in the following ways:
-    1. Locking 
+  2. Simultaneous edits of same parts of domain model (conflict resolution or
+     locking)
 
-  * Rather than summarize all situations just see Fowler on concurrency
+     1. Alice and Bob both get object X
+     2. Bob updates object X and commits (A's X is now out of date)
+     3. Alice updates object X and commits
+     4. Conflict!!
 
-7. Support for pending updates (so updates must be approved before visible)
+     This can be resolved in the following ways:
+
+     1. Locking 
+     2. Merging
+
+     Rather than summarize all situations just see Fowler on concurrency
+
+8. Support for pending updates (so updates must be approved before being visible)
   1. A non-approved user makes a change
   2. This change is marked as pending
   3. This change is notified to a moderator
