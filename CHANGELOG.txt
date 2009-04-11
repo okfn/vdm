@@ -1,9 +1,19 @@
-
-v0.4 ??
+v0.5
 ===============
 
-  * Support for non-integer primary keys (and keys not named 'id')
+  * ? Support for non-integer primary keys (and keys not named 'id')
   * ? Support for composite primary keys
+
+v0.4 2009-04-10
+===============
+
+(All for vdm.sqlalchemy)
+
+  * New Repository object (tools.py) to encapsulate repo-wide operations
+  * Repo create/clean/init operations
+  * Purge revision functionality (r408)
+  * List all objects changed in a revision (r408)
+  * Put stateful system under proper test and fix several major bugs (r418) 
 
 v0.3 2008-10-31
 ===============

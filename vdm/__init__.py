@@ -14,7 +14,7 @@ At present the package is provided as an extension to SQLAlchemy and SQLObject.
 Copyright and License
 =====================
 
-(c) 2007-2008 The Open Knowledge Foundation
+(c) 2007-2009 The Open Knowledge Foundation
 
 Licensed under the MIT license:
 
@@ -107,11 +107,11 @@ General Conceptual Documentation
 
 A great starting point is Fowler's *Patterns for things that change with time*:
 
-<http://www.martinfowler.com/ap2/timeNarrative.html>
+  <http://www.martinfowler.com/ap2/timeNarrative.html>
 
 In particular Temporal Object:
 
-<http://www.martinfowler.com/ap2/temporalObject.html>
+  <http://www.martinfowler.com/ap2/temporalObject.html>
 
 Two possible approaches:
 
@@ -137,6 +137,44 @@ Remark: using the first approach it is:
 The versioned domain model (vdm) package focuses on supporting the second case
 (this obviously includes the first one as a subcase) -- hence the name.
 
+
+Use Cases
+---------
+
+SA = Implemented in SQLAlchemy
+SO = Implemented in SQLObject (no longer maintained)
+
+1. (SA,SO) CRUD for a simple versioned object (no references other than HasA)
+
+2. (SA,SO) Undelete for "
+
+3. (SA,SO) Purge for "
+
+4. (SA,SO) Many-to-Many and many-2-one relationships where one of the objects is versioned.
+
+5. (SA) Consistent object traversal "in the past"
+
+6. Concurrency checking:
+  1. Simultaneous edits of different parts of the domain model
+  2. Simultaneous edits of same parts of domain model
+    (conflict resolution or locking)
+    1. Alice begins a txn
+    2. Alice gets object X
+    3. Bob begins a txn
+    4. gets object X
+    5. Bob changes object X and commits
+    6. Alice changes object X and commits
+      !!!!!!
+    This can be resolved in the following ways:
+    1. Locking 
+
+  * Rather than summarize all situations just see Fowler on concurrency
+
+7. Support for pending updates (so updates must be approved before visible)
+  1. A non-approved user makes a change
+  2. This change is marked as pending
+  3. This change is notified to a moderator
+  4. A moderator either allows or disallows the change
 '''
-__version__ = '0.4a'
+__version__ = '0.4'
 __description__ = 'A versioned domain model framework.'
