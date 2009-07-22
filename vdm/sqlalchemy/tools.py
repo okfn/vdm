@@ -181,7 +181,7 @@ class Repository(object):
                 self.session.delete(cont)
         if leave_record:
             import datetime
-            revision.message = 'PURGED: %s' % datetime.datetime.now()
+            revision.message = u'PURGED: %s' % datetime.datetime.now()
         else:
             self.session.delete(revision)
         self.commit_and_remove()
