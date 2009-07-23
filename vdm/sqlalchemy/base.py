@@ -133,6 +133,10 @@ def make_table_stateful(base_table):
             )
 
 def make_table_revisioned(base_table):
+    logger.warn('make_table_revisioned is deprecated: use make_revisioned_table')
+    return make_revisioned_table(base_table)
+
+def make_revisioned_table(base_table):
     '''Modify base_table and create correponding revision table.
 
     # TODO: (complex) support for complex primary keys on continuity. 
@@ -416,7 +420,7 @@ class Revisioner(MapperExtension):
         # Thus: set revision_id to ensure that value is saved
         # set revision to ensure object behaves how it should (e.g. we use
         # instance.revision in after_update)
-        assert current_rev
+        assert current_rev, 'No revision is currently set for this Session'
         assert current_rev.id
         instance.revision_id = current_rev.id
         instance.revision = current_rev

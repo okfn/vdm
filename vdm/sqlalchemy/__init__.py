@@ -1,7 +1,11 @@
 '''SQLAlchemy versioned domain model extension.
 
-Demo code in demo.py + demo_test.py. For general information about versioned
-domain models see the root vdm package docstring.
+For general information about versioned domain models see the root vdm package
+docstring.
+
+Annotated illustration of simple usage in simple_demo.py and more complex usage
+in demo.py and demo_test.py.
+
 
 Implementation Notes
 ====================
@@ -26,12 +30,7 @@ TODO
 
 2. Support for composite primary keys.
 
-3. 'ignored' fields on versioned objects (i.e. attributes which are not
-   'versioned'.
-
 4. Support for m2m collections other than lists.
-
-5. Support for diffing and reverting.
 '''
 from base import *
 from tools import Repository

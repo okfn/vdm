@@ -80,18 +80,6 @@ class Repository(object):
             self.commit()
         self.session.remove()
 
-    def new_revision(self):                                   
-        '''Convenience method to create new revision and set it on session.
-        
-        NB: if in transactional mode do *not* need to call `begin` as we are
-        automatically within a transaction at all times if session was set up
-        as transactional (every commit is paired with a begin)
-        <http://groups.google.com/group/sqlalchemy/browse_thread/thread/a54ce150b33517db/17587ca675ab3674>
-        '''
-        rev = Revision()                                      
-        SQLAlchemySession.set_revision(self.session, rev)             
-        return rev
-        
     def commit(self):
         '''Commit/flush (as appropriate) the Sqlalchemy session.'''
         # TODO: should we do something like set the revision state as well ...
@@ -110,11 +98,24 @@ class Repository(object):
         self.commit()
         self.session.remove()
     
-    def new_revision(self):
-        rev = Revision()
-        SQLAlchemySession.set_revision(self.session, rev)
+    def new_revision(self):                                   
+        '''Convenience method to create new revision and set it on session.
+        
+        NB: if in transactional mode do *not* need to call `begin` as we are
+        automatically within a transaction at all times if session was set up
+        as transactional (every commit is paired with a begin)
+        <http://groups.google.com/group/sqlalchemy/browse_thread/thread/a54ce150b33517db/17587ca675ab3674>
+        '''
+        rev = Revision()                                      
+        SQLAlchemySession.set_revision(self.session, rev)             
         return rev
 
+    def youngest_revision(self):
+        '''Get the youngest (most recent) revision.'''
+        q = self.history()
+        q = q.order_by(Revision.id.desc())
+        return q.first()
+        
     def history(self):
         '''Return a history of the repository as a query giving all active revisions.
         
