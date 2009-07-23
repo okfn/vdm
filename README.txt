@@ -7,3 +7,7 @@ open vdm/__init__.py or do (after installation)::
 
     >>> import vdm
     >>> help vdm
+
+To run tests use py.test, e.g:
+
+    $ py.test vdm/sqlalchemy
