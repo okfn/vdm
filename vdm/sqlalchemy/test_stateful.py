@@ -140,4 +140,117 @@ class TestStatefulList:
         self.slist.clear()
         assert len(self.slist) == 0
 
+    def test___repr__(self):
+        out = repr(self.slist)
+        assert out, out
+
+
+class TestStatefulDict:
+    active = ACTIVE
+    deleted = DELETED
+
+    def setup(self):
+        self.basedict = {
+            'a': Stateful('a'),
+            'b': Stateful('b', state=self.deleted),
+            'c': Stateful('c', state=self.deleted),
+            'd': Stateful('d'),
+            }
+        self.sa = self.basedict['a']
+        self.sb = self.basedict['b']
+        self.sc = self.basedict['c']
+        self.se = Stateful('e')
+        self.sf = Stateful('f')
+        self.sdict = StatefulDict(self.basedict, is_active=is_active)
+        # TODO: test deleted version
+
+    # py.test compatibility
+    def setup_method(self, name=''):
+        self.setup()
+
+    def test__contains__(self):
+        assert 'a' in self.sdict
+        assert not 'b' in self.sdict
+        assert not 'fajd' in self.sdict
+
+    def test___delitem__(self):
+        del self.sdict['a']
+        assert 'a' not in self.sdict
+        assert 'a' in self.basedict
+
+    def test___getitem__(self):
+        out = self.sdict['a']
+        assert out.state == ACTIVE
+        assert out.name == 'a'
+
+    def test___iter__(self):
+        # tested by __len__ etc
+        pass
+
+    def test___len__(self):
+        assert len(self.sdict) == 2
+
+    def test___setitem__(self):
+        self.sdict['e'] = self.se
+        assert len(self.sdict) == 3
+        self.sdict['a'] = self.sf
+        assert self.sdict['a'].name == 'f'
+
+    def test_clear(self):
+        self.sdict.clear()
+        assert len(self.sdict) == 0
+        assert len(self.basedict) == 4
+
+    def test_copy(self):
+        # TODO: implement this in StatefulDict
+        # self.sdict.copy()
+        pass
+
+    def test_get(self):
+        out = self.sdict.get('a', None)
+        assert out
+        out = self.sdict.get('b', None)
+        assert not out
+
+    def test_has_key(self):
+        assert self.sdict.has_key('a')
+        assert not self.sdict.has_key('b')
+        assert not self.sdict.has_key('xxxx')
+
+    def test_items(self):
+        out = self.sdict.items()
+        assert len(out) == 2
+        assert out[0][0] == 'a'
+        assert out[1][0] == 'd'
+
+    def test_iteritems(self):
+        # tested in items
+        pass
+
+    def test_iterkeys(self):
+        # tested in __iter__ 
+        pass
+
+    def test_itervalues(self):
+        # tested in values
+        pass
+
+    def test_keys(self):
+        out = self.sdict.keys()
+        assert isinstance(out, list)
+        assert len(out) == 2
+
+    def values(self):
+        out = self.sdict.values()
+        assert isinstance(out, list)
+        assert len(out) == 2
+        assert out[0].name == 'a'
+
+
+       # not yet implemented
+#     def pop(self):
+#         pass
+# 
+#     def popitem(self):
+#         pass
 

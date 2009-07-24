@@ -9,30 +9,14 @@ logger = logging.getLogger('vdm.stateful')
 import itertools
 
 
-class StatefulList(object):
-    '''A list which is 'state' aware and only shows objects which are in
-    'active' state.
-
-    What behaviour do we expect when adding an object already in the list to
-    the list? Note that when we say an object already in the list we mean
-    identical as determined by python 'in' function. This means, for example
-    that 2 objects which have different state attributes will not (usually) be
-    considered the same.
-
-    1. Ensure only one active object in the list at a time. So:
-        * if object is already active raise Exception
-        * If added object is deleted then undelete and move to end
-    2. Allow multiple objects in list. So:
-        * If active just append it
-        * if deleted undelete and then append
-       NB: this may have surprising results since when undeleting the deleted
-       object do not just undelete it but all the other copies in the list.
-
-    Here we implement option 1.
+class StatefulProxy(object):
+    '''A proxy to an underlying collection which contains stateful objects and
+    which only shows objects in a particular state (e.g. active ones).
     '''
-
-    def __init__(self, target_list, **kwargs):
+    def __init__(self, target, **kwargs):
         '''
+        @param target: the target (underlying) collection (list, dict, etc)
+
         Possible kwargs:
         
         is_active, delete, undelete: a method performing the relevant operation
@@ -47,18 +31,20 @@ class StatefulList(object):
             def get_as_of(x):
                 return x.get_as_of(revision)
 
+            WARNING: if base_modifier is not trivial (i.e. does not equal the
+            identify function: lambda x: x) then only read operations should be
+            performed on this proxy (this is because you will be operating on
+            modified rather than original objects).
+
             WARNING: when using base_modifier the objects returned from this list will
             not be list objects themselves but base_modifier(object).
             In particular, this means that when base_modifier is turned on
             operations that change the list (e.g. deletions) will operate on
             modified objects not the base objects!!
-
-        # TODO: not clear what happens if we have 'same' object in different
-        # states i.e. i re-add the same object but with a different state then
-        # ends up with two different object in the system which is maybe not
-        # what we want ... (this needs some careful checking)
         '''
-        self.baselist = target_list 
+        self.target = target
+        # TODO: remove this and update StatefulList
+        self.baselist = target
 
         extra_args = ['is_active', 'delete', 'undelete', 'base_modifier']
         for argname in extra_args:
@@ -76,10 +62,40 @@ class StatefulList(object):
         self._set_stateful_operators()
 
     def _set_stateful_operators(self):
-        self._is_active = self.is_active
+        self._is_active = lambda x: self.is_active(self.base_modifier(x))
         self._delete = self.delete
         self._undelete = self.undelete
 
+
+class StatefulList(StatefulProxy):
+    '''A list which is 'state' aware and only shows objects which are in
+    'active' state.
+
+    Discussion
+    ==========
+
+    What behaviour do we expect when adding an object already in the list to
+    the list? Note that when we say an object already in the list we mean
+    identical as determined by python 'in' function. This means, for example
+    that 2 objects which have different state attributes will not (usually) be
+    considered the same.
+
+    1. Ensure only one active object in the list at a time. So:
+        * if object is already active raise Exception
+        * If added object is deleted then undelete and move to end
+    2. Allow multiple objects in list. So:
+        * If active just append it
+        * if deleted undelete and then append
+       NB: this may have surprising results since when undeleting the deleted
+       object do not just undelete it but all the other copies in the list.
+
+    Here we implement option 1.
+
+    # TODO: not clear what happens if we have 'same' object in different
+    # states i.e. i re-add the same object but with a different state then
+    # ends up with two different object in the system which is maybe not
+    # what we want ... (this needs some careful checking)
+    '''
     def _get_base_index(self, idx):
         # if we knew items were unique could do
         # return self.baselist.index(self[myindex])
@@ -93,7 +109,7 @@ class StatefulList(object):
             tbaselist = self.baselist
         for item in tbaselist:
             basecount += 1
-            if self._is_active(self.base_modifier(item)):
+            if self._is_active(item):
                 count += 1
             if count == myindex:
                 if idx < 0:
@@ -103,6 +119,7 @@ class StatefulList(object):
         raise IndexError
 
     def append(self, obj):
+        # TODO: should we have self.base_modifier(obj)?
         if obj in self.baselist:
             if self._is_active(obj):
                 # assume unique items in list o/w not meaningful
@@ -175,8 +192,7 @@ class StatefulList(object):
     #        self[ii] = values[ii-start]
 
     def __iter__(self):
-        # TODO: maybe base_modifier should be folded into the operators ...
-        mytest = lambda x: self._is_active(self.base_modifier(x))
+        mytest = lambda x: self._is_active(x)
         myiter = itertools.ifilter(mytest, iter(self.baselist))
         return myiter
     
@@ -199,28 +215,102 @@ class StatefulList(object):
         del self[0:len(self)]
     
     def __repr__(self):
-        return repr(self.copy())
+        return repr(self.target)
 
 
 class StatefulListDeleted(StatefulList):
 
     def _set_stateful_operators(self):
-        self._is_active = lambda x: not self.is_active(x)
+        self._is_active = lambda x: not self.is_active(self.base_modifier(x))
         self._delete = self.undelete
         self._undelete = self.delete
 
     
-class StatefulListProperty(object):
-    def __init__(self, target_list_name, stateful_class=StatefulList, **kwargs):
-        '''Turn StatefulList into a property to allowed for deferred access.
+class StatefulDict(StatefulProxy):
+    '''A stateful dictionary which only shows object in underlying dictionary
+    which are in active state.
+    '''
+
+    # sqlalchemy assoc proxy fails to guess this is a dictionary w/o prompting
+    # (util.duck_type_collection appears to identify dict by looking for a set
+    # method but dicts don't have this method!)
+    __emulates__ = dict
+
+    def __contains__(self, k):
+        return k in self.target and self._is_active(self.target[k])
+
+    def __delitem__(self, k):
+        # will raise KeyError if not there (which is what we want)
+        val = self.target[k]
+        if self._is_active(val):
+            self._delete(val)
+        else:
+            raise KeyError(k)
+        # should we raise KeyError if already deleted?
+
+    def __getitem__(self, k):
+        out = self.target[k]
+        if self._is_active(out):
+            return self.base_modifier(out)
+        else:
+            raise KeyError(k)
+
+    def __iter__(self):
+        myiter = itertools.ifilter(lambda x: self._is_active(self.target[x]),
+                iter(self.target))
+        return myiter
+
+    def __setitem__(self, k, v):
+        self.target[k] = v
+
+    def __len__(self):
+        return sum([1 for _ in self])
+
+    def clear(self): 
+        for k in self:
+            del self[k]
+
+    def copy(self):
+        # return self.__class__(self.target, base_modifier=self.base_modifier)
+        return dict(self)
+
+    def get(self, k, d=None):
+        if k in self:
+            return self[k]
+        else:
+            return d
+
+    def has_key(self, k):
+        return k in self
+    
+    def items(self):
+        return [ x for x in self.iteritems() ]
+
+    def iteritems(self):
+        for k in self:
+            yield k,self[k]
+
+    def keys(self):
+        return [ k for k in self ]
+
+    def __repr__(self):
+        return repr(self.target)
+
+
+
+class DeferredProperty(object):
+    def __init__(self, target_collection_name, stateful_class=StatefulList, **kwargs):
+        '''Turn StatefulList into a property to allowed for deferred access
+        (important as collections to which they are proxying may also be
+        deferred).
 
         For details of other args see L{StatefulList}.
         '''
-        self.target_list_name = target_list_name
+        self.target_collection_name = target_collection_name
         self.stateful_class = stateful_class
         self.cached_kwargs = kwargs
         self.cached_instance_key = '_%s_%s_%s' % (type(self).__name__,
-                self.target_list_name, id(self))
+                self.target_collection_name, id(self))
 
     def __get__(self, obj, class_):
         try:
@@ -228,14 +318,13 @@ class StatefulListProperty(object):
             return getattr(obj, self.cached_instance_key)
         except AttributeError:
             # probably should do this using lazy_collections a la assoc proxy
-            target_list = getattr(obj, self.target_list_name)
-            stateful_list = self.stateful_class(target_list, **self.cached_kwargs)
+            target_collection = getattr(obj, self.target_collection_name)
+            stateful_list = self.stateful_class(target_collection, **self.cached_kwargs)
             # cache
             setattr(obj, self.cached_instance_key, stateful_list)
             return stateful_list
 
     def __set__(self, obj, values):
-        # TODO: assign to underlying stateful list
         raise NotImplementedError()
 
 
@@ -264,6 +353,7 @@ class OurAssociationProxy(sqlalchemy.ext.associationproxy.AssociationProxy):
             self._set(proxy, values)
 
 
+# TODO: 2009-07-24 support dict collections
 def add_stateful_m2m(object_to_alter, m2m_object, m2m_property_name,
         attr, basic_m2m_name, **kwargs):
     '''Attach active and deleted stateful lists along with the association
@@ -300,12 +390,12 @@ def add_stateful_m2m(object_to_alter, m2m_object, m2m_property_name,
 
     @arg attr: the name of the attribute on the Join object corresponding to
         the target (e.g. in this case 'license' on PackageLicense).
-    @arg **kwargs: these are passed on to the StatefulListProperty.
+    @arg **kwargs: these are passed on to the DeferredProperty.
     '''
     active_name = m2m_property_name + '_active'
-    active_prop = StatefulListProperty(basic_m2m_name, **kwargs)
+    active_prop = DeferredProperty(basic_m2m_name, **kwargs)
     deleted_name = m2m_property_name + '_deleted'
-    deleted_prop = StatefulListProperty(basic_m2m_name, StatefulListDeleted,
+    deleted_prop = DeferredProperty(basic_m2m_name, StatefulListDeleted,
             **kwargs)
     setattr(object_to_alter, active_name, active_prop)
     setattr(object_to_alter, deleted_name, deleted_prop)

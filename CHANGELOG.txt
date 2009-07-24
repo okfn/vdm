@@ -1,6 +1,7 @@
 v0.5
 ===============
 
+  * Support stateful dict-like collections (already support list-like ones)
   * ? Support for non-integer primary keys (and keys not named 'id')
   * ? Support for composite primary keys
 
