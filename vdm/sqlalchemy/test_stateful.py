@@ -47,6 +47,11 @@ class TestStatefulList:
         self.slist = StatefulList(self.baselist, is_active=is_active)
         # TODO: more testing of StatefulListDeleted
         self.slist_deleted = StatefulListDeleted(self.baselist, is_active=is_active)
+        self.startlen = 2
+        self.startlen_base = 4
+
+    def setup(self):
+        self.setup_method()
 
     def test__get_base_index(self):
         exp = [0, 3]
@@ -56,8 +61,8 @@ class TestStatefulList:
         assert exp == out
 
     def test___len__(self):
-        assert len(self.baselist) == 4
-        assert len(self.slist) == 2
+        assert len(self.baselist) == self.startlen_base
+        assert len(self.slist) == self.startlen
         assert len(self.slist_deleted) == 2
 
     def test___get_item__(self):
@@ -67,21 +72,21 @@ class TestStatefulList:
         assert self.slist[-1] == self.baselist[-1]
 
     def test_append(self):
-        assert len(self.baselist) == 4
-        assert len(self.slist) == 2
+        assert len(self.baselist) == self.startlen_base
+        assert len(self.slist) == self.startlen
 
         # already in the list but deleted 
         self.slist.append(self.sb)
-        assert len(self.baselist) == 4
-        assert len(self.slist) == 3
+        assert len(self.baselist) == self.startlen_base
+        assert len(self.slist) == self.startlen + 1
         # ensure it has moved to the end ...
         assert self.slist[-1] == self.sb
         assert self.baselist[-1] == self.sb
 
         # not in the list
         self.slist.append(self.se)
-        assert len(self.baselist) == 5
-        assert len(self.slist) == 4
+        assert len(self.baselist) == self.startlen_base + 1
+        assert len(self.slist) == self.startlen + 2
 
         # already in the list but active
         have_exception = False
@@ -99,26 +104,39 @@ class TestStatefulList:
         # assert len(self.baselist) == 4
         # assert len(self.slist) == 4
 
-    def _test_insert(self):
-        # TODO: get this working
+    def test_insert(self):
         self.slist.insert(0, self.sb)
         assert len(self.baselist) == 4
         assert len(self.slist) == 3
-        # TODO:
-        pass
 
     def test_delete(self):
         del self.slist[0]
-        assert len(self.baselist) == 4
-        assert len(self.slist) == 1
+        assert len(self.baselist) == self.startlen_base
+        assert len(self.slist) == self.startlen - 1
         assert self.baselist[0].state == self.deleted
 
+    def test___setitem__0(self):
+        self.slist[0] = self.sf
+        assert len(self.slist) == self.startlen
+        assert self.slist[0].name == 'f'
+
+        assert self.baselist[0].name == 'a'
+        assert self.baselist[0].state == self.deleted
+        assert len(self.baselist) == self.startlen_base + 1
+
     def test___setitem__(self):
-        # does not work ...
+        self.slist[0] = self.sa
+        # should have no change
+        assert len(self.slist) == self.startlen
+        assert len(self.baselist) == self.startlen_base
+
+    def test___setitem__2(self):
+        # obviously this can't work since it is setting to list object itself
         # self.slist = [1,2,3]
-        # want this to become self.slist[:] = [1,2,3]
+        # in our vdm code does not matter since OurAssociationProxy has a
+        # special __set__ which takes of this (converts to clear() + set)
         self.slist[:] = []
-        assert len(self.baselist) == 4
+        assert len(self.baselist) == self.startlen_base
         assert len(self.slist) == 0
         for item in self.baselist:
             assert item.state == self.deleted

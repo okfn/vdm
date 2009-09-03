@@ -178,6 +178,7 @@ class TestStatefulVersioned:
         repo.rebuild_db()
         logger.info('====== TestVersioning2: start')
 
+        # create a package with some tags
         rev1 = repo.new_revision()
         self.name1 = 'anna'
         p1 = Package(name=self.name1)
@@ -188,12 +189,14 @@ class TestStatefulVersioned:
         Session.commit()
         self.rev1_id = rev1.id
         Session.remove()
-
+        
+        # now remove those tags
         logger.debug('====== start Revision 2')
         rev2 = repo.new_revision()
         newp1 = Package.query.filter_by(name=self.name1).one()
-        # newp1.tags = []
-        newp1.tags_active.clear()
+        # either one works
+        newp1.tags = []
+        # newp1.tags_active.clear()
         assert len(newp1.tags_active) == 0
         Session.commit()
         logger.info('TAGS_ACTIVE: %s' % newp1.tags_active)
@@ -201,11 +204,12 @@ class TestStatefulVersioned:
         self.rev2_id = rev2.id
         Session.remove()
 
+        # now add one of them back
         logger.debug('====== start Revision 3')
         rev3 = repo.new_revision()
-        newp1 = Package.query.filter_by(name=self.name1).first()
+        newp1 = Package.query.filter_by(name=self.name1).one()
         self.tagname1 = 'geo'
-        t1 = Tag.query.filter_by(name=self.tagname1).first()
+        t1 = Tag.query.filter_by(name=self.tagname1).one()
         assert t1
         newp1.tags.append(t1)
         repo.commit_and_remove()
@@ -216,7 +220,14 @@ class TestStatefulVersioned:
 
     def test_remove_and_readd_m2m(self):
         p1 = Package.query.filter_by(name=self.name1).one()
-        assert len(p1.package_tags) == 3
+        # should be 3: package-geo PackageTag now appears twice (active and
+        # deleted) and package-geo2 appears once (in deleted state)
+        # might think it should be 2 (after all this is not
+        # PackageTagRevisions) but we allow the same tag multiple times in
+        # package.tags. As such it is not possible for us to decide that a
+        # given tag being re-added corresponds to the "same" tag already in the
+        # list in deleted state
+        assert len(p1.package_tags) == 3, p1.package_tags
         assert len(p1.tags_active) == 1
         assert len(p1.tags) == 1
         Session.remove()
@@ -265,6 +276,53 @@ class TestStatefulVersioned:
         print rev2.id
         print p2rev.tags_active
         assert len(p2rev.tags) == 0
+
+
+class TestStatefulVersioned2:
+    '''Test setting m2m list using an existing object'''
+
+    @classmethod
+    def setup_class(self):
+        repo.rebuild_db()
+        logger.info('====== TestStatefulVersioned2: start')
+
+        # create a package with some tags
+        rev1 = repo.new_revision()
+        self.name1 = 'anna'
+        p1 = Package(name=self.name1)
+        t1 = Tag(name='geo')
+        p1.tags.append(t1)
+        Session.commit()
+        self.rev1_id = rev1.id
+        Session.remove()
+        
+        logger.debug('====== start Revision 2')
+        rev2 = repo.new_revision()
+        newp1 = Package.query.filter_by(name=self.name1).one()
+        t1 = Tag.query.filter_by(name='geo').one()
+        t2 = Tag(name='geo2')
+        # does not work
+        newp1.tags = [ t1, t2 ]
+        # does not work
+        # newp1.tags[:] = [ t1, t2 ]
+        # this works ...
+        # newp1.tags[0] = t1
+        # newp1.tags.append(t2)
+        Session.commit()
+        self.rev2_id = rev2.id
+        repo.commit_and_remove()
+
+    @classmethod
+    def teardown_class(self):
+        Session.remove()
+
+    def test_package_tags(self):
+        p1 = Package.query.filter_by(name=self.name1).one()
+        assert len(p1.package_tags) == 2, p1.package_tags
+
+    def test_tags(self):
+        p1 = Package.query.filter_by(name=self.name1).one()
+        assert len(p1.tags) == 2, p1.tags
 
 
 class TestRevertAndPurge:

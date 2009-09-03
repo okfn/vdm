@@ -68,8 +68,12 @@ class StatefulProxy(object):
 
 
 class StatefulList(StatefulProxy):
-    '''A list which is 'state' aware and only shows objects which are in
-    'active' state.
+    '''A list which is 'state' aware.
+    
+    The list only shows objects which are in 'active' state in the target list
+    and list operations on this list change the state of the objects in the
+    underlying list. For example deleting an object from the list puts the
+    object in a deleted state.
 
     Discussion
     ==========
@@ -95,18 +99,21 @@ class StatefulList(StatefulProxy):
     # states i.e. i re-add the same object but with a different state then
     # ends up with two different object in the system which is maybe not
     # what we want ... (this needs some careful checking)
+
+    # TODO: should we have self.base_modifier(obj) more frequently used? (e.g.
+    # in __iter__, append, etc
     '''
     def _get_base_index(self, idx):
         # if we knew items were unique could do
-        # return self.baselist.index(self[myindex])
+        # return self.target.index(self[myindex])
         count = -1
         basecount = -1
         if idx < 0:
             myindex = -(idx) - 1
-            tbaselist = reversed(self.baselist)
+            tbaselist = reversed(self.target)
         else:
             myindex = idx
-            tbaselist = self.baselist
+            tbaselist = self.target
         for item in tbaselist:
             basecount += 1
             if self._is_active(item):
@@ -118,30 +125,36 @@ class StatefulList(StatefulProxy):
                     return basecount
         raise IndexError
 
+    def _check_for_existing_on_add(self, obj):
+        # do we already have object in list in active state
+        unique_active = True
+        if self._is_active(obj) and obj in self.target and unique_active:
+            msg = 'Multiple active items in list not supported'
+            raise Exception(msg)
+        # do we already have in list in deleted state
+        self._delete(obj)
+        if obj in self.target:
+            # find first index and delete from there
+            idx = self.target.index(obj)
+            del self.target[idx]
+        self._undelete(obj)
+
     def append(self, obj):
-        # TODO: should we have self.base_modifier(obj)?
-        if obj in self.baselist:
-            if self._is_active(obj):
-                # assume unique items in list o/w not meaningful
-                msg = 'Multiple items with same state in list not supported'
-                raise Exception(msg)
-            else:
-                self._undelete(obj)
-                del self.baselist[self.baselist.index(obj)]
-                self.baselist.append(obj)
-        else:
-            # ensure it is in correct state
-            self._undelete(obj)
-            self.baselist.append(obj)
+        self._check_for_existing_on_add(obj)
+        self.target.append(obj)
 
     def insert(self, index, value):
         # have some choice here so just for go for first place
-        baseindex = self._get_base_index(index)
-        self.baselist.insert(baseindex+1, value)
+        self._check_for_existing_on_add(value)
+        try:
+            baseindex = self._get_base_index(index)
+        except IndexError: # 
+            baseindex = len(self)
+        self.target.insert(baseindex, value)
 
     def __getitem__(self, index):
         baseindex = self._get_base_index(index)
-        return self.base_modifier(self.baselist[baseindex])
+        return self.base_modifier(self.target[baseindex])
     
     def __item__(self, index):
         return self.__getitem__(self, index)
@@ -158,19 +171,24 @@ class StatefulList(StatefulProxy):
 
     def __setitem__(self, index, value):
         if not isinstance(index, slice):
-            baseindex = self._get_base_index(index)
-            self.baselist[baseindex] = value
+            del self[index]
+            self.insert(index, value)
         else:
             if index.stop is None:
                 stop = len(self)
             elif index.stop < 0:
                 stop = len(self) + index.stop
+            # avoid weird MemoryError when doing OurList[:] = ...
+            elif index.stop > len(self):
+                stop = len(self)
             else:
                 stop = index.stop
             step = index.step or 1
 
             rng = range(index.start or 0, stop, step)
             if step == 1:
+                # delete first then insert to avoid problems with indices and
+                # statefulness
                 for ii in rng:
                     start = rng[0]
                     del self[start]
@@ -193,7 +211,7 @@ class StatefulList(StatefulProxy):
 
     def __iter__(self):
         mytest = lambda x: self._is_active(x)
-        myiter = itertools.ifilter(mytest, iter(self.baselist))
+        myiter = itertools.ifilter(mytest, iter(self.target))
         return myiter
     
     def __len__(self):
@@ -213,6 +231,12 @@ class StatefulList(StatefulProxy):
 
     def clear(self):
         del self[0:len(self)]
+    
+    def pop(self, index=None):
+        raise NotImplementedError
+
+    def reverse(self):
+        raise NotImplementedError
     
     def __repr__(self):
         return repr(self.target)
