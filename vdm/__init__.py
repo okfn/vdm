@@ -10,6 +10,9 @@ this distinction see below).
 
 At present the package is provided as an extension to SQLAlchemy and SQLObject.
 
+The library is pretty stable and robust and has been used by the authors in
+production systems since v0.2 (May 2008).
+
 
 Copyright and License
 =====================
@@ -152,12 +155,12 @@ Use Cases
 ---------
 
 SA = Implemented in SQLAlchemy
-SO = Implemented in SQLObject (no longer maintained)
+SO = Implemented in SQLObject (no longer actively maintained)
 
 1. (SA,SO) CRUD for a simple versioned object (no references other than HasA)
 
-2. (SA,SO) Many-2-Many and many-2-one relationships where one or both of the
-objects are versioned.
+2. (SA,SO) Versioning of Many-2-Many and many-2-one relationships where one or
+both of the related objects are versioned.
 
 3. (SA,SO) Undelete for the above.
 
