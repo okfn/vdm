@@ -1,4 +1,60 @@
-'''Support for stateful lists.
+'''Support for stateful collections.
+
+Stateful collections are essential to the functioning of VDM's m2m support.
+m2m relationships become stateful when versioned and the associated collection must
+become state-aware.
+
+There are several subtleties in doing this, the most significant of which is
+how one copes with adding an "existing" object to a stateful list which already
+contains that object in deleted form (or, similarly, when moving an item within
+a list which normally corresponds to a delete and an insert).
+
+
+Stateful Lists and "Existing" Objects Problem
+=============================================
+
+The problem here is that the "existing" object and the object being added are
+not literally the same object in the python sense. Why? First, because their
+state may differ and the ORM is not aware that state is irrelevant to identity.
+Second, and more significantly because the ORM often does not fully "create"
+the object until a flush which is too late - we already have duplicates in the
+list. Here's a concrete example::
+
+    # Package, Tag, PackageTag objects with Package.package_tags_active being
+    # StatefulList and Package.tags a proxy to this showing the tags
+
+    pkg.tags = [ tag1 ]
+    # pkg.package_tags now contains 2 items
+    # PackageTag(pkg=
+
+    pkg1 = Package('abc')
+    tag1 = Tag(name='x')
+    pkg1.tags.append(tag1)
+    # pkg1.package_tags contains one PackageTag
+
+    # delete tag1
+    del pkg.tags[0]
+    # so PackageTag(pkg=pkg1, tag=tag1) is now in deleted state
+    pkg.tags.append(tag1)
+    # now pkg.package_tags has length 2!
+    # Why? Really we want to undelete PackageTag(pkg=pkg1, tag=tag1)
+    # however for association proxy what happens is that
+    # we get a new PackageTag(pkg=None, tag=tag1) created and this is not
+    # identified with existing PackageTag(pkg=pkg1, tag=tag1) because pkg=None
+    # on new PackageTag (pkg only set on flush)
+    # Thus a new item is appended rather than existing being undeleted
+
+    # even more seriously suppose pkg.tags is [tag1]
+    # what happens if we do
+    pkg.tags = [tag1]
+    # does *not* result in nothing happen
+    # instead existing PackageTag(pkg=pkg1, tag=tag1) is put in deleted state and
+    # new PackageTag(pkg=None, tag=tag1) is appended with this being changed to
+    # PackageTag(pkg=pkg1, tag=tag1) on commit (remember sqlalchemy does not
+    # resolve m2m objects foreign key for owner object until flush time)
+
+How do we solve this? The only real answer is implement an identify map in the
+stateful list.
 
 TODO: create some proper tests for base_modifier stuff.
 TODO: move stateful material from base.py here?
@@ -10,8 +66,12 @@ import itertools
 
 
 class StatefulProxy(object):
-    '''A proxy to an underlying collection which contains stateful objects and
-    which only shows objects in a particular state (e.g. active ones).
+    '''A proxy to an underlying collection which contains stateful objects.
+
+    The proxy only shows objects in a particular state (e.g. active ones) and
+    will also transform standard collection operations to make them 'stateful'
+    -- for example deleting from the list will not delete the object but simply
+    place it in a deleted state.
     '''
     def __init__(self, target, **kwargs):
         '''
@@ -43,8 +103,6 @@ class StatefulProxy(object):
             modified objects not the base objects!!
         '''
         self.target = target
-        # TODO: remove this and update StatefulList
-        self.baselist = target
 
         extra_args = ['is_active', 'delete', 'undelete', 'base_modifier']
         for argname in extra_args:
@@ -70,11 +128,6 @@ class StatefulProxy(object):
 class StatefulList(StatefulProxy):
     '''A list which is 'state' aware.
     
-    The list only shows objects which are in 'active' state in the target list
-    and list operations on this list change the state of the objects in the
-    underlying list. For example deleting an object from the list puts the
-    object in a deleted state.
-
     Discussion
     ==========
 
@@ -103,6 +156,26 @@ class StatefulList(StatefulProxy):
     # TODO: should we have self.base_modifier(obj) more frequently used? (e.g.
     # in __iter__, append, etc
     '''
+    def __init__(self, target, **kwargs):
+        '''Same as for StatefulProxy but with additional kwarg:
+        identify: a function which takes an object and return a key
+        identifying that object for use in an internal identity map. (See
+        discussion in main docstring for why this is required).
+
+        self.identity_map = {
+            'key': [ list of objects with that key ]
+        }
+        # simplest thing 
+
+        separate question as to uniqueness in our lists ...
+        '''
+        super(StatefulList, self).__init__(target, **kwargs)
+        identifier = kwargs.get('identifier', lambda x: x)
+        self._identifier = identifier
+        self._identity_map = {}
+        for obj in self.target:
+            self._add_to_identity_map(obj)
+
     def _get_base_index(self, idx):
         # if we knew items were unique could do
         # return self.target.index(self[myindex])
@@ -125,32 +198,41 @@ class StatefulList(StatefulProxy):
                     return basecount
         raise IndexError
 
-    def _check_for_existing_on_add(self, obj):
-        # do we already have object in list in active state
-        unique_active = True
-        if self._is_active(obj) and obj in self.target and unique_active:
-            msg = 'Multiple active items in list not supported'
-            raise Exception(msg)
-        # do we already have in list in deleted state
-        self._delete(obj)
-        if obj in self.target:
-            # find first index and delete from there
-            idx = self.target.index(obj)
-            del self.target[idx]
-        self._undelete(obj)
+    def _add_to_identity_map(self, obj):
+        objkey = self._identifier(obj)
+        current = self._identity_map.get(objkey, [])
+        current.append(obj)
+        self._identity_map[objkey] = current
 
-    def append(self, obj):
-        self._check_for_existing_on_add(obj)
+    def _check_for_existing_on_add(self, obj):
+        objkey = self._identifier(obj)
+        def _existing_deleted_obj(objkey):
+            for existing_obj in self._identity_map.get(objkey, []):
+                if not self._is_active(existing_obj):
+                    return existing_obj
+        out_obj = _existing_deleted_obj(objkey)
+        if out_obj is None:
+            out_obj = obj 
+            self._identity_map[objkey] = self._identity_map.get(objkey,
+                    []).append(out_obj)
+        else: # remove that existing item from target list as about to re-add
+            idx = self.target.index(out_obj)
+            del self.target[idx]
+        self._undelete(out_obj)
+        return out_obj
+
+    def append(self, in_obj):
+        obj = self._check_for_existing_on_add(in_obj)
         self.target.append(obj)
 
     def insert(self, index, value):
         # have some choice here so just for go for first place
-        self._check_for_existing_on_add(value)
+        our_obj = self._check_for_existing_on_add(value)
         try:
             baseindex = self._get_base_index(index)
-        except IndexError: # 
+        except IndexError: # may be list is empty ...
             baseindex = len(self)
-        self.target.insert(baseindex, value)
+        self.target.insert(baseindex, our_obj)
 
     def __getitem__(self, index):
         baseindex = self._get_base_index(index)
@@ -446,26 +528,6 @@ def make_m2m_creator_for_assocproxy(m2m_object, attrname):
     @param m2m_object: the m2m object underlying association proxy.
     @param attrname: the attrname to use for the default object passed in to m2m
     '''
-    # TODO: 2009-02-17 as yet no *positive* test of this functionality
-    # TODO: is it even needed?
-    def has_existing(mykwargs):
-        # first try to retrieve on basis of mykwargs
-        q = m2m_object.query
-        for k,v in mykwargs.items():
-            # HACK: because these are related attributes cannot use simple
-            # queries but need to use *_id attributes
-            # This requires us to assume these are in standard form ...
-            # Even more complicated: if no flush yet then won't be any ids
-            # (though in that case certain this is a new appending)
-            if getattr(v, 'id') is None:
-                return None # foreign object is not yet even created yet
-            # TODO: deal with this properly
-            kw = k + '_id'
-            tmpkwargs = {kw:v.id}
-            q = q.filter_by(**tmpkwargs)
-        existing = q.first()
-        return existing
-
     def create_m2m(foreign, **kw):
         mykwargs = dict(kw)
         mykwargs[attrname] = foreign

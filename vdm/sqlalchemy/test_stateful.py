@@ -5,9 +5,10 @@ DELETED = 'deleted'
 
 
 class Stateful(object):
-    def __init__(me, name='', state=ACTIVE):
+    def __init__(me, name='', order=None, state=ACTIVE):
         me.name = name
         me.state = state
+        me.order = order
         
     def delete(me):
         me.state = DELETED
@@ -32,7 +33,7 @@ class TestStatefulList:
     active = ACTIVE
     deleted = DELETED
 
-    def setup_method(self, name=''):
+    def setup(self):
         self.sb = Stateful('b', state=self.deleted)
         self.baselist = [
                 Stateful('a'),
@@ -50,8 +51,8 @@ class TestStatefulList:
         self.startlen = 2
         self.startlen_base = 4
 
-    def setup(self):
-        self.setup_method()
+    def setup_method(self, name=''):
+        self.setup()
 
     def test__get_base_index(self):
         exp = [0, 3]
@@ -75,38 +76,14 @@ class TestStatefulList:
         assert len(self.baselist) == self.startlen_base
         assert len(self.slist) == self.startlen
 
-        # already in the list but deleted 
-        self.slist.append(self.sb)
-        assert len(self.baselist) == self.startlen_base
-        assert len(self.slist) == self.startlen + 1
-        # ensure it has moved to the end ...
-        assert self.slist[-1] == self.sb
-        assert self.baselist[-1] == self.sb
-
         # not in the list
         self.slist.append(self.se)
         assert len(self.baselist) == self.startlen_base + 1
-        assert len(self.slist) == self.startlen + 2
-
-        # already in the list but active
-        have_exception = False
-        try:
-            self.slist.append(self.sa)
-        except:
-            have_exception = True
-        assert have_exception, 'Should raise exception on append of active'
-
-        # in list deleted and now add active version
-        # (this cannot work work because no concept of same item in active and
-        # deleted state ...)
-        # self.sc.state = ACTIVE
-        # self.slist.append(self.sc)
-        # assert len(self.baselist) == 4
-        # assert len(self.slist) == 4
+        assert len(self.slist) == self.startlen + 1
 
     def test_insert(self):
-        self.slist.insert(0, self.sb)
-        assert len(self.baselist) == 4
+        self.slist.insert(0, self.se)
+        assert len(self.baselist) == 5
         assert len(self.slist) == 3
 
     def test_delete(self):
@@ -124,14 +101,8 @@ class TestStatefulList:
         assert self.baselist[0].state == self.deleted
         assert len(self.baselist) == self.startlen_base + 1
 
-    def test___setitem__(self):
-        self.slist[0] = self.sa
-        # should have no change
-        assert len(self.slist) == self.startlen
-        assert len(self.baselist) == self.startlen_base
-
     def test___setitem__2(self):
-        # obviously this can't work since it is setting to list object itself
+        # obviously this would't work since it is setting to list object itself
         # self.slist = [1,2,3]
         # in our vdm code does not matter since OurAssociationProxy has a
         # special __set__ which takes of this (converts to clear() + set)
@@ -161,6 +132,62 @@ class TestStatefulList:
     def test___repr__(self):
         out = repr(self.slist)
         assert out, out
+
+class TestStatefulListComplex:
+    active = ACTIVE
+    deleted = DELETED
+
+    def setup(self):
+        self.sb = Stateful('b', state=self.deleted)
+        self.baselist = [
+                Stateful('a'),
+                self.sb,
+                Stateful('c', state=self.deleted),
+                Stateful('d'),
+                ]
+        self.sa = self.baselist[0]
+        self.sc = self.baselist[2]
+        self.se = Stateful('e')
+        self.sf = Stateful('f')
+        identifier = lambda statefulobj: statefulobj.name
+        self.slist = StatefulList(self.baselist, is_active=is_active,
+                identifier=identifier)
+        self.startlen = 2
+        self.startlen_base = 4
+    
+    # py.test
+    def setup_method(self, name=''):
+        self.setup()
+    
+    def test_append(self):
+        # already in the list but deleted 
+        self.slist.append(self.sb)
+        assert len(self.baselist) == self.startlen_base
+        assert len(self.slist) == self.startlen + 1
+        # ensure it has moved to the end ...
+        assert self.slist[-1] == self.sb
+        assert self.baselist[-1] == self.sb
+
+    def test_append_different_obj(self):
+        newsb = Stateful('b', order=1)
+        self.slist.append(newsb)
+        assert len(self.slist) == self.startlen + 1
+        assert len(self.baselist) == self.startlen_base
+
+    def _test_append_with_unique(self):
+        # already in the list but active
+        have_exception = False
+        try:
+            self.slist.append(self.sa)
+        except:
+            have_exception = True
+        assert have_exception, 'Should raise exception on append of active'
+
+    def test___setitem__with_same_object(self):
+        self.slist[0] = self.sa
+        # should have no change
+        assert len(self.slist) == self.startlen
+        assert len(self.baselist) == self.startlen_base
 
 
 class TestStatefulDict:
