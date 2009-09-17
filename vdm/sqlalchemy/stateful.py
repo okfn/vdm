@@ -143,6 +143,18 @@ class StatefulList(StatefulProxy):
         @param identifier: a function which takes an object and return a key
             identifying that object for use in an internal identity map. (See
             discussion in main docstring for why this is required).
+
+        @param unneeded_deleter: function to delete objects which have
+        been added to the list but turn out to be unneeded (because existing
+        deleted object already exists). Reason for existence: (going back to
+        example in main docstring) suppose we pkg1.package_tags already
+        contains tag1 ('geo') but in deleted state. We then do
+        pkg1.tags.append(tag1). This results in a new PackageTag pkgtag2 being
+        created by creator function in assoc proxy and passed on to stateful
+        list. Thanks to the identifier we notice this already exists and
+        undelete the existing PackageTag rather than adding this new one. But
+        what do we with this pkgtag2? We need to 'get rid of it' so it is not
+        committed into the the db.
         '''
         super(StatefulList, self).__init__(target, **kwargs)
         identifier = kwargs.get('identifier', lambda x: x)
@@ -196,7 +208,9 @@ class StatefulList(StatefulProxy):
             # we are about to re-add (in active state) so must remove it first
             idx = self.target.index(out_obj)
             del self.target[idx]
-            
+            # We now have have to deal with original `obj` that was passed in
+            self._unneeded_deleter(obj)
+
         self._undelete(out_obj)
         return out_obj
 
@@ -489,6 +503,18 @@ def add_stateful_m2m(object_to_alter, m2m_object, m2m_property_name,
         def identifier(joinobj):
             return getattr(joinobj, attr)
         kwargs['identifier'] = identifier
+    if not 'unneeded_deleter' in kwargs:
+        # For sqlalchemy this means expunging the object ...
+        # (Note we can assume object is 'new' since it didn't match any
+        # existing one in -- see _check_for_existing_on_add in StatefulList)
+        # (NB: this assumption turns out to be false in some special cases --
+        # see comments in test in test_demo.py:TestVersioning2.test_2)
+        from sqlalchemy.orm import object_session
+        def _f(obj_to_delete):
+            sess = object_session(obj_to_delete)
+            if sess: # for tests at least must support obj not being sqlalchemy
+                sess.expunge(obj_to_delete)
+        kwargs['unneeded_deleter'] = _f
 
     active_prop = DeferredProperty(basic_m2m_name, StatefulList, **kwargs)
     deleted_name = m2m_property_name + '_deleted'
