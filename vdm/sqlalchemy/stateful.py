@@ -53,8 +53,11 @@ list. Here's a concrete example::
     # PackageTag(pkg=pkg1, tag=tag1) on commit (remember sqlalchemy does not
     # resolve m2m objects foreign key for owner object until flush time)
 
-How do we solve this? The only real answer is implement an identify map in the
-stateful list.
+How do we solve this? The only real answer is implement an identity map in the
+stateful list based on a supplier identifier function. This is done in the code
+below. It has the effect of restoring expected behaviour in the above examples
+(further demonstrations can be found in the tests).
+
 
 TODO: create some proper tests for base_modifier stuff.
 TODO: move stateful material from base.py here?
@@ -92,7 +95,7 @@ class StatefulProxy(object):
                 return x.get_as_of(revision)
 
             WARNING: if base_modifier is not trivial (i.e. does not equal the
-            identify function: lambda x: x) then only read operations should be
+            identity function: lambda x: x) then only read operations should be
             performed on this proxy (this is because you will be operating on
             modified rather than original objects).
 
@@ -128,50 +131,24 @@ class StatefulProxy(object):
 class StatefulList(StatefulProxy):
     '''A list which is 'state' aware.
     
-    Discussion
-    ==========
-
-    What behaviour do we expect when adding an object already in the list to
-    the list? Note that when we say an object already in the list we mean
-    identical as determined by python 'in' function. This means, for example
-    that 2 objects which have different state attributes will not (usually) be
-    considered the same.
-
-    1. Ensure only one active object in the list at a time. So:
-        * if object is already active raise Exception
-        * If added object is deleted then undelete and move to end
-    2. Allow multiple objects in list. So:
-        * If active just append it
-        * if deleted undelete and then append
-       NB: this may have surprising results since when undeleting the deleted
-       object do not just undelete it but all the other copies in the list.
-
-    Here we implement option 1.
-
-    # TODO: not clear what happens if we have 'same' object in different
-    # states i.e. i re-add the same object but with a different state then
-    # ends up with two different object in the system which is maybe not
-    # what we want ... (this needs some careful checking)
+    NB: there is some subtlety as to behaviour when adding an "existing" object
+    to the list -- see the main module docstring for details.
 
     # TODO: should we have self.base_modifier(obj) more frequently used? (e.g.
     # in __iter__, append, etc
     '''
     def __init__(self, target, **kwargs):
         '''Same as for StatefulProxy but with additional kwarg:
-        identify: a function which takes an object and return a key
-        identifying that object for use in an internal identity map. (See
-        discussion in main docstring for why this is required).
 
-        self.identity_map = {
-            'key': [ list of objects with that key ]
-        }
-        # simplest thing 
-
-        separate question as to uniqueness in our lists ...
+        @param identifier: a function which takes an object and return a key
+            identifying that object for use in an internal identity map. (See
+            discussion in main docstring for why this is required).
         '''
         super(StatefulList, self).__init__(target, **kwargs)
         identifier = kwargs.get('identifier', lambda x: x)
+        unneeded_deleter = kwargs.get('unneeded_deleter', lambda x: None)
         self._identifier = identifier
+        self._unneeded_deleter = unneeded_deleter
         self._identity_map = {}
         for obj in self.target:
             self._add_to_identity_map(obj)
@@ -204,20 +181,22 @@ class StatefulList(StatefulProxy):
         current.append(obj)
         self._identity_map[objkey] = current
 
+    def _existing_deleted_obj(self, objkey):
+        for existing_obj in self._identity_map.get(objkey, []):
+            if not self._is_active(existing_obj): # return 1st we find
+                return existing_obj
+
     def _check_for_existing_on_add(self, obj):
         objkey = self._identifier(obj)
-        def _existing_deleted_obj(objkey):
-            for existing_obj in self._identity_map.get(objkey, []):
-                if not self._is_active(existing_obj):
-                    return existing_obj
-        out_obj = _existing_deleted_obj(objkey)
-        if out_obj is None:
+        out_obj = self._existing_deleted_obj(objkey)
+        if out_obj is None: # no existing deleted object in list
             out_obj = obj 
-            self._identity_map[objkey] = self._identity_map.get(objkey,
-                    []).append(out_obj)
-        else: # remove that existing item from target list as about to re-add
+            self._add_to_identity_map(out_obj)
+        else: # deleted object already in list
+            # we are about to re-add (in active state) so must remove it first
             idx = self.target.index(out_obj)
             del self.target[idx]
+            
         self._undelete(out_obj)
         return out_obj
 
@@ -405,10 +384,15 @@ class StatefulDict(StatefulProxy):
 
 
 class DeferredProperty(object):
-    def __init__(self, target_collection_name, stateful_class=StatefulList, **kwargs):
+    def __init__(self, target_collection_name, stateful_class, **kwargs):
         '''Turn StatefulList into a property to allowed for deferred access
         (important as collections to which they are proxying may also be
         deferred).
+
+        @param target_collection_name: name of attribute on object to which
+        instance of stateful_class is being attached which stateful_class will
+        'wrap'.
+        @param kwargs: additional arguments to stateful_class (if any)
 
         For details of other args see L{StatefulList}.
         '''
@@ -494,12 +478,19 @@ def add_stateful_m2m(object_to_alter, m2m_object, m2m_property_name,
         licenses_deleted # these are deleted PackageLicenses
         licenses # these are active *Licenses*
 
-    @arg attr: the name of the attribute on the Join object corresponding to
+    @param attr: the name of the attribute on the Join object corresponding to
         the target (e.g. in this case 'license' on PackageLicense).
     @arg **kwargs: these are passed on to the DeferredProperty.
     '''
     active_name = m2m_property_name + '_active'
-    active_prop = DeferredProperty(basic_m2m_name, **kwargs)
+    # in the join object (e.g. PackageLicense) the License object accessible by
+    # the license attribute will be what we need for our identity map
+    if not 'identifier' in kwargs:
+        def identifier(joinobj):
+            return getattr(joinobj, attr)
+        kwargs['identifier'] = identifier
+
+    active_prop = DeferredProperty(basic_m2m_name, StatefulList, **kwargs)
     deleted_name = m2m_property_name + '_deleted'
     deleted_prop = DeferredProperty(basic_m2m_name, StatefulListDeleted,
             **kwargs)
@@ -514,28 +505,12 @@ def add_stateful_m2m(object_to_alter, m2m_object, m2m_property_name,
 def make_m2m_creator_for_assocproxy(m2m_object, attrname):
     '''This creates a_creator function for SQLAlchemy associationproxy pattern.
 
-    Similar to standard one but with a few tweaks. In particular we have to be
-    a little careful because we don't want to create a new object if we have an
-    existing object but which just happens to be in a different state. Thus, we
-    first look up to see if there is an existing object based on info we have.
-
-    TODO: is this really an issue or does sqlalchemy take care of this anyway?
-
-    TODO: this problem should go away once we support complex primary keys
-    since then we can have a multi-col primary key on m2m table (usually pks of
-    2 related tables) and excluding state
-    
     @param m2m_object: the m2m object underlying association proxy.
     @param attrname: the attrname to use for the default object passed in to m2m
     '''
     def create_m2m(foreign, **kw):
         mykwargs = dict(kw)
         mykwargs[attrname] = foreign
-        # existing = has_existing(mykwargs)
-        existing = None
-        if existing:
-            return existing
-        else:
-            return m2m_object(**mykwargs)
+        return m2m_object(**mykwargs)
 
     return create_m2m

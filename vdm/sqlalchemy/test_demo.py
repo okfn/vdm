@@ -220,14 +220,7 @@ class TestStatefulVersioned:
 
     def test_remove_and_readd_m2m(self):
         p1 = Package.query.filter_by(name=self.name1).one()
-        # should be 3: package-geo PackageTag now appears twice (active and
-        # deleted) and package-geo2 appears once (in deleted state)
-        # might think it should be 2 (after all this is not
-        # PackageTagRevisions) but we allow the same tag multiple times in
-        # package.tags. As such it is not possible for us to decide that a
-        # given tag being re-added corresponds to the "same" tag already in the
-        # list in deleted state
-        assert len(p1.package_tags) == 3, p1.package_tags
+        assert len(p1.package_tags) == 2, p1.package_tags
         assert len(p1.tags_active) == 1
         assert len(p1.tags) == 1
         Session.remove()
@@ -257,13 +250,12 @@ class TestStatefulVersioned:
         assert ptrevs[0].revision_id == rev2.id
 
     def test_remove_and_readd_m2m_2(self):
-        # should be 2 ...
-        # NB: all these relations on revision object proxy to continuity
-        # (though with get_as_of revision set)
-        num_package_tags = 3
+        num_package_tags = 2
         rev1 = Revision.query.get(self.rev1_id)
         p1 = Package.query.filter_by(name=self.name1).one()
         p1rev = p1.get_as_of(rev1)
+        # NB: relations on revision object proxy to continuity
+        # (though with get_as_of revision set)
         assert len(p1rev.package_tags) == num_package_tags
         assert len(p1rev.tags) == 2
         Session.remove()
@@ -279,10 +271,10 @@ class TestStatefulVersioned:
 
 
 class TestStatefulVersioned2:
-    '''Test setting m2m list using an existing object'''
+    '''Similar to previous but setting m2m list using existing objects'''
 
-    @classmethod
-    def setup_class(self):
+    def setup(self):
+        Session.remove()
         repo.rebuild_db()
         logger.info('====== TestStatefulVersioned2: start')
 
@@ -295,34 +287,74 @@ class TestStatefulVersioned2:
         Session.commit()
         self.rev1_id = rev1.id
         Session.remove()
-        
-        logger.debug('====== start Revision 2')
-        rev2 = repo.new_revision()
-        newp1 = Package.query.filter_by(name=self.name1).one()
-        t1 = Tag.query.filter_by(name='geo').one()
-        t2 = Tag(name='geo2')
-        # does not work
-        newp1.tags = [ t1, t2 ]
-        # does not work
-        # newp1.tags[:] = [ t1, t2 ]
-        # this works ...
-        # newp1.tags[0] = t1
-        # newp1.tags.append(t2)
-        Session.commit()
-        self.rev2_id = rev2.id
-        repo.commit_and_remove()
 
+    def setup_method(self, name=''):
+        self.setup()
+        
     @classmethod
     def teardown_class(self):
         Session.remove()
 
-    def test_package_tags(self):
+    def _test_package_tags(self):
         p1 = Package.query.filter_by(name=self.name1).one()
         assert len(p1.package_tags) == 2, p1.package_tags
 
-    def test_tags(self):
+    def _test_tags(self):
         p1 = Package.query.filter_by(name=self.name1).one()
         assert len(p1.tags) == 2, p1.tags
+
+    def test_1(self):
+        rev2 = repo.new_revision()
+        newp1 = Package.query.filter_by(name=self.name1).one()
+        t1 = Tag.query.filter_by(name='geo').one()
+        t2 = Tag(name='geo2')
+        newp1.tags = [ t1, t2 ]
+        repo.commit_and_remove()
+
+        self._test_package_tags()
+        self._test_tags()
+    
+    def test_2(self):
+        rev2 = repo.new_revision()
+        newp1 = Package.query.filter_by(name=self.name1).one()
+        t1 = Tag.query.filter_by(name='geo').one()
+        t2 = Tag(name='geo2')
+        newp1.tags[:] = [ t1, t2 ]
+        repo.commit_and_remove()
+
+        self._test_package_tags()
+        self._test_tags()
+
+    def test_3(self):
+        rev2 = repo.new_revision()
+        newp1 = Package.query.filter_by(name=self.name1).one()
+        t1 = Tag.query.filter_by(name='geo').one()
+        t2 = Tag(name='geo2')
+        newp1.tags[0] = t1
+        newp1.tags.append(t2)
+        repo.commit_and_remove()
+
+        self._test_package_tags()
+        self._test_tags()
+
+    def test_4(self):
+        rev2 = repo.new_revision()
+        newp1 = Package.query.filter_by(name=self.name1).one()
+        t1 = Tag.query.filter_by(name='geo').one()
+        t2 = Tag(name='geo2')
+        newp1.tags[:] = [ t1, t2 ]
+        newp1.tags[0] = t1
+        del newp1.tags[1]
+        newp1.tags.append(t2)
+        # NB: doing this the other way round will result in 3 PackageTags
+        # newp1.tags.append(t2)
+        # del newp1.tags[1]
+        # this is because our system can't work out that we've just added and
+        # deleted the same tag
+        repo.commit_and_remove()
+
+        self._test_package_tags()
+        self._test_tags()
 
 
 class TestRevertAndPurge:
