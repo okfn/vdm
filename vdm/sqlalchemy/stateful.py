@@ -392,6 +392,10 @@ class StatefulDict(StatefulProxy):
     def keys(self):
         return [ k for k in self ]
 
+    def iterkeys(self):
+        for k in self:
+            yield k
+
     def __repr__(self):
         return repr(self.target)
 

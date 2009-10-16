@@ -273,8 +273,8 @@ class TestStatefulDict:
         pass
 
     def test_iterkeys(self):
-        # tested in __iter__ 
-        pass
+        keys = [k for k in self.sdict.iterkeys()]
+        assert keys == ['a', 'd'], keys
 
     def test_itervalues(self):
         # tested in values
