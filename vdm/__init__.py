@@ -27,7 +27,7 @@ Licensed under the MIT license:
 Authors
 =======
 
-Rufus Pollock <rufus [at] rufuspollock [dot] org>
+Rufus Pollock - http://rufuspollock.org/
 
 
 A Full Versioned Domain Model
@@ -120,11 +120,11 @@ General Conceptual Documentation
 
 A great starting point is Fowler's *Patterns for things that change with time*:
 
-  <http://www.martinfowler.com/ap2/timeNarrative.html>
+  http://www.martinfowler.com/ap2/timeNarrative.html
 
 In particular Temporal Object:
 
-  <http://www.martinfowler.com/ap2/temporalObject.html>
+  http://www.martinfowler.com/ap2/temporalObject.html
 
 Two possible approaches:
 
@@ -193,5 +193,5 @@ both of the related objects are versioned.
   3. This change is notified to a moderator
   4. A moderator either allows or disallows the change
 '''
-__version__ = '0.5a'
+__version__ = '0.5'
 __description__ = 'A versioned domain model framework.'
