@@ -105,6 +105,7 @@ mapper(PackageLicense, package_license_table, properties={
 
 class TestStatefulCollections(object):
 
+    @classmethod
     def setup_class(self):
         pkg1 = Package('pkg1')
         lic1 = License('a')
@@ -118,16 +119,16 @@ class TestStatefulCollections(object):
         session.flush()
         session.clear()
 
-    def test_package_licenses(self):
+    def test_0_package_licenses(self):
         pkg1 = Package.query.get('pkg1')
         assert len(pkg1.package_licenses) == 4
         assert pkg1.package_licenses[-1].state == 'deleted'
 
-    def test_licenses(self):
+    def test_1_licenses(self):
         p1 = Package.query.get('pkg1')
         assert len(p1.licenses) == 3
 
-    def test_active_deleted_and_appending(self):
+    def test_2_active_deleted_and_appending(self):
         p1 = Package.query.get('pkg1')
         assert len(p1.licenses_active) == 3
         assert len(p1.licenses_deleted) == 1
@@ -142,7 +143,7 @@ class TestStatefulCollections(object):
         assert len(p1.licenses_deleted) == 2
         session.clear()
 
-    def test_assign_etc(self):
+    def test_3_assign_etc(self):
         p1 = Package.query.get('pkg1')
         p1.licenses = []
         assert len(p1.licenses) == 0 
@@ -160,6 +161,7 @@ class TestStatefulCollections(object):
 # fixtures)
 class TestStatefulVersionedCollections(object):
 
+    @classmethod
     def setup_class(self):
         pkg2 = Package('pkg2')
         lic1 = License('a')
@@ -173,16 +175,16 @@ class TestStatefulVersionedCollections(object):
         session.flush()
         session.clear()
 
-    def test_package_licenses(self):
+    def test_0_package_licenses(self):
         pkg2 = Package.query.get('pkg2')
         assert len(pkg2.package_licenses) == 4
         assert pkg2.package_licenses[-1].state == 'deleted'
 
-    def test_licenses3(self):
+    def test_1_licenses3(self):
         p1 = Package.query.get('pkg2')
         assert len(p1.licenses3) == 3
 
-    def test_active_deleted_and_appending(self):
+    def test_2_active_deleted_and_appending(self):
         p1 = Package.query.get('pkg2')
         assert len(p1.licenses3_active) == 3
         assert len(p1.licenses3_deleted) == 1
@@ -197,7 +199,7 @@ class TestStatefulVersionedCollections(object):
         assert len(p1.licenses3_deleted) == 2
         session.clear()
 
-    def test_assign_etc(self):
+    def test_3_assign_etc(self):
         p1 = Package.query.get('pkg2')
         p1.licenses3 = []
         assert len(p1.licenses3) == 0 

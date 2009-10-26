@@ -16,7 +16,8 @@ ACTIVE = 'active'
 DELETED = 'deleted'
 
 
-class TestSQLAlchemySession:
+class Test0SQLAlchemySession:
+ 
     def test_1(self):
         assert not hasattr(Session, 'revision')
         assert vdm.sqlalchemy.SQLAlchemySession.at_HEAD(Session)
@@ -78,6 +79,7 @@ class TestVersioning:
         self.ts2 = rev2.timestamp
         Session.clear()
 
+    @classmethod
     def teardown_class(self):
         Session.remove()
 
@@ -216,14 +218,14 @@ class TestStatefulVersioned:
     def teardown_class(self):
         Session.remove()
 
-    def test_remove_and_readd_m2m(self):
+    def test_0_remove_and_readd_m2m(self):
         p1 = Package.query.filter_by(name=self.name1).one()
         assert len(p1.package_tags) == 2, p1.package_tags
-        assert len(p1.tags_active) == 1
+        assert len(p1.tags_active) == 1, p1.tags_active
         assert len(p1.tags) == 1
         Session.remove()
 
-    def test_underlying_is_right(self):
+    def test_1_underlying_is_right(self):
         rev1 = Revision.query.get(self.rev1_id)
         ptrevs = PackageTagRevision.query.filter_by(revision_id=rev1.id).all()
         assert len(ptrevs) == 2
@@ -238,7 +240,7 @@ class TestStatefulVersioned:
     
     # test should be higher up but need at least 3 revisions for problem to
     # show up
-    def test_get_as_of(self):
+    def test_2_get_as_of(self):
         p1 = Package.query.filter_by(name=self.name1).one()
         rev2 = Revision.query.get(self.rev2_id)
         # should be 2 deleted and 1 as None
@@ -247,7 +249,7 @@ class TestStatefulVersioned:
         print PackageTagRevision.query.all()
         assert ptrevs[0].revision_id == rev2.id
 
-    def test_remove_and_readd_m2m_2(self):
+    def test_3_remove_and_readd_m2m_2(self):
         num_package_tags = 2
         rev1 = Revision.query.get(self.rev1_id)
         p1 = Package.query.filter_by(name=self.name1).one()
