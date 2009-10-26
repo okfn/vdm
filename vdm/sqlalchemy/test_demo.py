@@ -49,8 +49,11 @@ class TestVersioning:
         self.name2 = 'warandpeace'
         self.title1 = 'XYZ'
         self.title2 = 'ABC'
+        self.notes1 = u'Here\nare some\nnotes'
+        self.notes2 = u'Here\nare no\nnotes'
         lic1 = License(name='blah', open=True)
-        p1 = Package(name=self.name1, title=self.title1, license=lic1)
+        lic2 = License(name='foo', open=True)
+        p1 = Package(name=self.name1, title=self.title1, license=lic1, notes=self.notes1)
         p2 = Package(name=self.name2, title=self.title1, license=lic1)
 
         logger.debug('***** Committing/Flushing Rev 1')
@@ -66,10 +69,13 @@ class TestVersioning:
         rev2 = Revision()
         vdm.sqlalchemy.SQLAlchemySession.set_revision(session, rev2)
         outlic1 = License.query.filter_by(name='blah').first()
-        outlic1.open = False
+        outlic2 = License.query.filter_by(name='foo').first()
+        outlic2.open = False
         outp1 = Package.query.filter_by(name=self.name1).one()
         outp2 = Package.query.filter_by(name=self.name2).one()
         outp1.title = self.title2
+        outp1.notes = self.notes2
+        outp1.license = outlic2
         t1 = Tag(name='geo')
         outp1.tags = [t1]
         outp2.delete()
@@ -77,6 +83,7 @@ class TestVersioning:
         session.commit()
         # must do this after flush as timestamp not set until then
         self.ts2 = rev2.timestamp
+        self.rev2_id = rev2.id
         Session.clear()
 
     @classmethod
@@ -94,11 +101,11 @@ class TestVersioning:
         assert rev.timestamp == self.ts2
 
     def test_basic(self):
-        assert len(License.query.all()) == 1
-        assert len(Package.query.all()) == 2
+        assert License.query.count() == 2, License.query.count()
+        assert Package.query.count() == 2, Package.query.count()
         assert 'revision_id' in LicenseRevision.c
-        assert len(LicenseRevision.query.all()) == 2
-        assert len(PackageRevision.query.all()) == 4
+        assert LicenseRevision.query.count() == 3, LicenseRevision.query.count()
+        assert PackageRevision.query.count() == 4, PackageRevision.query.count()
 
     def test_all_revisions(self):
         p1 = Package.query.filter_by(name=self.name1).one()
@@ -173,6 +180,24 @@ class TestVersioning:
         rev1 = Revision.query.get(self.rev1_id)
         assert rev1.state.name == ACTIVE
 
+    def test_diff_basic(self):
+        prs = PackageRevision.query.filter(PackageRevision.name==self.name1).order_by(PackageRevision.c.revision_id.desc()).all()
+        pr1, pr2 = prs[::-1]
+        p1 = Package.query.filter_by(name=self.name1).one()
+        
+        diff = repo.diff_object(p1, pr1, pr2)
+        assert diff['title'] == '- XYZ\n+ ABC', diff['title']
+        assert diff['notes'] == '  Here\n- are some\n+ are no\n  notes', diff['notes']
+        assert diff['license_id'] == '- 1\n+ 2', diff['license_id']
+
+    def test_diff_no_params(self):
+        prs = PackageRevision.query.filter(PackageRevision.name==self.name1).order_by(PackageRevision.c.revision_id.desc()).all()
+        pr1, pr2 = prs[::-1]
+        p1 = Package.query.filter_by(name=self.name1).one()
+        
+        diff1 = repo.diff_object(p1)
+        diff2 = repo.diff_object(p1, pr1, pr2)
+        assert diff1 == diff2
 
 class TestStatefulVersioned:
     @classmethod

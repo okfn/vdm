@@ -37,6 +37,7 @@ package_table = Table('package', metadata,
         Column('name', String(100)),
         Column('title', String(100)),
         Column('license_id', Integer, ForeignKey('license.id')),
+        Column('notes', UnicodeText),
 )
 
 tag_table = Table('tag', metadata,

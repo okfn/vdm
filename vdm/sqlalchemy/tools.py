@@ -5,6 +5,8 @@ Primarily organized within a `Repository` object.
 import logging
 logger = logging.getLogger('vdm')
 
+import difflib
+
 # fix up table dropping on postgres
 # http://blog.pythonisito.com/2008/01/cascading-drop-table-with-sqlalchemy.html
 from sqlalchemy.databases import postgres
@@ -135,6 +137,48 @@ class Repository(object):
             items = revobj.query.filter_by(revision=revision).all()
             results[o] = items
         return results
+
+    def diff_object(self, obj, obj_rev1=None, obj_rev2=None):
+        '''
+         @param obj_rev1: if None, defaults to one revision older then obj_rev2
+         @param obj_rev2: if None, defaults to the youngest rev
+         @return: dict of diffs keyed by field name
+        '''
+        revision_class = obj.__revision_class__
+        if not obj_rev2:
+             sess = object_session(obj)
+             revision = SQLAlchemySession.get_revision(sess)
+             out = revision_class.query.filter(revision_class.revision_id <= revision.id).filter(revision_class.id == obj.id).order_by(revision_class.c.revision_id.desc())
+             obj_rev2 = out.first()
+        if not obj_rev1:
+             sess = object_session(obj)
+             revision = SQLAlchemySession.get_revision(sess)
+             out = revision_class.query.filter(revision_class.revision_id < obj_rev2.revision_id).filter(revision_class.id == obj.id).filter(revision_class.id == obj.id).order_by(revision_class.c.revision_id.desc())
+             obj_rev1 = out.first()
+
+        assert isinstance(obj_rev1, revision_class), obj_rev1
+        assert isinstance(obj_rev2, revision_class), obj_rev2
+        
+        diffs = {}
+        fields = obj.get_fields()
+        revids = [obj_rev1.id, obj_rev2.id]
+
+        for field in fields:
+             values = [getattr(rev, field) for rev in [obj_rev1, obj_rev2]]
+             diff = self._differ(values[0], values[1])
+             if diff:
+                  diffs[field] = diff
+        
+        return diffs
+
+    def _differ(self, str_a, str_b):
+        str_a = str(str_a)
+        str_b = str(str_b)
+        if str_a != str_b:
+            return '\n'.join(difflib.Differ().compare(str_a.split('\n'), str_b.split('\n')))
+        else:
+            return None
+
 
     def purge_revision(self, revision, leave_record=False):
         '''Purge all changes associated with a revision.

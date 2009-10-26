@@ -207,8 +207,16 @@ class StatefulObjectMixin(object):
 
 
 class RevisionedObjectMixin(object):
-
+    __ignored_fields__ = ['revision_id']
     __revisioned__ = True
+
+    def get_fields(self):
+        fields = []
+        table = sqlalchemy.orm.class_mapper(self).mapped_table
+        for col in table.c:
+            if col.name not in self.__ignored_fields__:
+                fields.append(col.name)
+        return fields
 
     def get_as_of(self, revision=None):
         '''Get this domain object at the specified revision.
