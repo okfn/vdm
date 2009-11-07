@@ -5,9 +5,11 @@ from base import *
 
 class TestMisc:
 
+    @classmethod
     def setup_class(self):
         Session.begin()
 
+    @classmethod
     def teardown_class(self):
         Session.rollback()
         Session.remove()
