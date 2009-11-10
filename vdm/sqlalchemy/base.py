@@ -1,4 +1,6 @@
 from datetime import datetime
+import uuid
+make_uuid = lambda: unicode(uuid.uuid4())
 
 import logging
 logger = logging.getLogger('vdm')
@@ -69,7 +71,7 @@ def make_state_table(metadata):
 
 def make_revision_table(metadata):
     revision_table = Table('revision', metadata,
-            Column('id', Integer, primary_key=True),
+            Column('id', UnicodeText, primary_key=True, default=make_uuid),
             Column('timestamp', DateTime, default=datetime.now),
             Column('author', String(200)),
             Column('message', UnicodeText),
@@ -106,7 +108,7 @@ class Revision(SQLAlchemyMixin):
             q = session.query(self.__class__)
         else: # this depends upon having a contextual session
             q = self.query
-        q = q.order_by(self.c.id.desc())
+        # order by is already set by mapper
         return q.first()
 
     def __repr__(self):
@@ -116,7 +118,7 @@ def make_Revision(mapper, revision_table):
     mapper(Revision, revision_table, properties={
         'state':relation(State)
         },
-        order_by=revision_table.c.id.desc())
+        order_by=revision_table.c.timestamp.desc())
     return Revision
 
 ## --------------------------------------------------------
@@ -145,7 +147,7 @@ def make_revisioned_table(base_table):
     @return revision table.
     '''
     base_table.append_column(
-            Column('revision_id', Integer, ForeignKey('revision.id'))
+            Column('revision_id', UnicodeText, ForeignKey('revision.id'))
             )
     newtable = Table(base_table.name + '_revision', base_table.metadata,
             )
@@ -247,15 +249,15 @@ class RevisionedObjectMixin(object):
             revision_class = self.__revision_class__
             # TODO: when dealing with multi-col pks will need to update this
             # (or just use continuity)
-            out = revision_class.query.\
+            out = revision_class.query.join('revision').\
                 filter(
-                    revision_class.revision_id <= revision.id
+                    Revision.timestamp <= revision.timestamp
                 ).\
                 filter(
                     revision_class.id == self.id
                 ).\
                 order_by(
-                    revision_class.c.revision_id.desc()
+                    Revision.timestamp.desc()
                 )
             return out.first()
 

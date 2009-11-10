@@ -181,7 +181,9 @@ class TestVersioning:
         assert rev1.state.name == ACTIVE
 
     def test_diff_basic(self):
-        prs = PackageRevision.query.filter(PackageRevision.name==self.name1).order_by(PackageRevision.c.revision_id.desc()).all()
+        prs = PackageRevision.query.join('revision').\
+                filter(PackageRevision.name==self.name1).\
+                order_by(Revision.timestamp.desc()).all()
         pr1, pr2 = prs[::-1]
         p1 = Package.query.filter_by(name=self.name1).one()
         
@@ -191,13 +193,16 @@ class TestVersioning:
         assert diff['license_id'] == '- 1\n+ 2', diff['license_id']
 
     def test_diff_no_params(self):
-        prs = PackageRevision.query.filter(PackageRevision.name==self.name1).order_by(PackageRevision.c.revision_id.desc()).all()
+        prs = PackageRevision.query.join('revision').\
+                filter(PackageRevision.name==self.name1).\
+                order_by(Revision.timestamp.desc()).all()
         pr1, pr2 = prs[::-1]
         p1 = Package.query.filter_by(name=self.name1).one()
         
         diff1 = repo.diff_object(p1)
         diff2 = repo.diff_object(p1, pr1, pr2)
-        assert diff1 == diff2
+        assert diff1 == diff2, (diff1, diff2)
+
 
 class TestStatefulVersioned:
     @classmethod

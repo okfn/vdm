@@ -148,17 +148,22 @@ class Repository(object):
         if not obj_rev2:
              sess = object_session(obj)
              revision = SQLAlchemySession.get_revision(sess)
-             out = revision_class.query.filter(revision_class.revision_id <= revision.id).filter(revision_class.id == obj.id).order_by(revision_class.c.revision_id.desc())
+             out = revision_class.query.join('revision').\
+                 filter(Revision.timestamp <= revision.timestamp).\
+                 filter(revision_class.id == obj.id).\
+                 order_by(Revision.timestamp.desc())
              obj_rev2 = out.first()
         if not obj_rev1:
              sess = object_session(obj)
              revision = SQLAlchemySession.get_revision(sess)
-             out = revision_class.query.filter(revision_class.revision_id < obj_rev2.revision_id).filter(revision_class.id == obj.id).filter(revision_class.id == obj.id).order_by(revision_class.c.revision_id.desc())
+             out = revision_class.query.join('revision').\
+                 filter(Revision.timestamp<obj_rev2.revision.timestamp).\
+                 filter(revision_class.id==obj.id).\
+                 order_by(Revision.timestamp.desc())
              obj_rev1 = out.first()
 
-        assert isinstance(obj_rev1, revision_class), obj_rev1
-        assert isinstance(obj_rev2, revision_class), obj_rev2
-        
+        print obj_rev2.revision
+        print obj_rev1.revision
         diffs = {}
         fields = obj.get_fields()
         revids = [obj_rev1.id, obj_rev2.id]
@@ -210,9 +215,9 @@ class Repository(object):
                 continuity = item.continuity
 
                 if continuity.revision == revision: # need to change continuity
-                    trevobjs = revobj.query.filter_by(
-                            continuity=continuity
-                            ).order_by(revobj.c.revision_id.desc()).limit(2).all()
+                    trevobjs = revobj.query.join('revision').  filter(
+                            revobj.continuity==continuity
+                            ).order_by(Revision.timestamp.desc()).limit(2).all()
                     if len(trevobjs) == 0:
                         raise Exception('Should have at least one revision.')
                     if len(trevobjs) == 1:
