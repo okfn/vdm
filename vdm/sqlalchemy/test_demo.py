@@ -94,7 +94,7 @@ class TestVersioning:
         revs = Revision.query.all()
         assert len(revs) == 2
         # also check order (youngest first)
-        assert revs[0].id > revs[1].id
+        assert revs[0].timestamp > revs[1].timestamp
 
     def test_revision_youngest(self):
         rev = Revision.youngest()
@@ -110,6 +110,10 @@ class TestVersioning:
     def test_all_revisions(self):
         p1 = Package.query.filter_by(name=self.name1).one()
         assert len(p1.all_revisions) == 2
+        # problem here is that it might pass even if broken because ordering of
+        # uuid ids is 'right' 
+        revs = [ pr.revision for pr in p1.all_revisions ]
+        assert revs[0].timestamp > revs[1].timestamp, revs
 
     def test_basic_2(self):
         # should be at HEAD (i.e. rev2) by default 

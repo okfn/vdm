@@ -111,8 +111,6 @@ class Revision(SQLAlchemyMixin):
         # order by is already set by mapper
         return q.first()
 
-    def __repr__(self):
-        return '<Revision %s>' % self.id 
 
 def make_Revision(mapper, revision_table):
     mapper(Revision, revision_table, properties={
@@ -260,6 +258,15 @@ class RevisionedObjectMixin(object):
                     Revision.timestamp.desc()
                 )
             return out.first()
+    
+    @property
+    def all_revisions(self):
+        allrevs = self.all_revisions_unordered
+        ourcmp = lambda revobj1, revobj2: cmp(revobj1.revision.timestamp,
+                revobj2.revision.timestamp)
+        sorted_revobjs = sorted(allrevs, cmp=ourcmp, reverse=True)
+        return sorted_revobjs
+
 
 ## --------------------------------------------------------
 ## Mapper Helpers
@@ -297,10 +304,11 @@ def create_object_version(mapper_fn, base_object, rev_table):
     base_object.__revision_class__ = MyClass
 
     ourmapper = mapper_fn(MyClass, rev_table, properties={
-        # NB: call it all_revisions rather than just revisions because it will
-        # yield all revisions not just those less than the current revision
+        # NB: call it all_revisions_... rather than just revisions_... as it
+        # will yield all revisions not just those less than the current
+        # revision
         'continuity':relation(base_object,
-            backref=backref('all_revisions',
+            backref=backref('all_revisions_unordered',
                 cascade='all, delete, delete-orphan'),
                 order_by=rev_table.c.revision_id.desc()
             ),
