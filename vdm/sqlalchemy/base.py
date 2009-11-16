@@ -210,12 +210,11 @@ class RevisionedObjectMixin(object):
     __ignored_fields__ = ['revision_id']
     __revisioned__ = True
 
-    def get_fields(self):
-        fields = []
+    @property
+    def revisioned_fields(self):
         table = sqlalchemy.orm.class_mapper(self).mapped_table
-        for col in table.c:
-            if col.name not in self.__ignored_fields__:
-                fields.append(col.name)
+        fields = [ col.name for col in table.c if col.name not in
+                self.__ignored_fields__ ]
         return fields
 
     def get_as_of(self, revision=None):
@@ -453,7 +452,6 @@ class Revisioner(MapperExtension):
         if values is None: # object not yet created
             logger.debug('check_real_change: True')
             return True
-        ignored = [ 'revision_id' ]
 
         # (Based on Elixir's solution to this problem)
         # SA might've flagged this for an update even though it didn't change.
@@ -461,9 +459,7 @@ class Revisioner(MapperExtension):
         # for a save/update operation. We check here against the last version
         # to ensure we really should save this version and update the version
         # data.
-        for key in table.c.keys():
-            if key in ignored:
-                continue
+        for key in instance.revisioned_fields:
             if getattr(instance, key) != values[key]:
                 # the instance was really updated, so we create a new version
                 logger.debug('check_real_change: True')

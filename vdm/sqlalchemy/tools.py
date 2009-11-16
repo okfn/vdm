@@ -165,7 +165,7 @@ class Repository(object):
         print obj_rev2.revision
         print obj_rev1.revision
         diffs = {}
-        fields = obj.get_fields()
+        fields = obj.revisioned_fields
         revids = [obj_rev1.id, obj_rev2.id]
 
         for field in fields:
