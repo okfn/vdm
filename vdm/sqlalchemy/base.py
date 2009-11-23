@@ -1,4 +1,5 @@
 from datetime import datetime
+import difflib
 import uuid
 make_uuid = lambda: unicode(uuid.uuid4())
 
@@ -265,6 +266,57 @@ class RevisionedObjectMixin(object):
                 revobj2.revision.timestamp)
         sorted_revobjs = sorted(allrevs, cmp=ourcmp, reverse=True)
         return sorted_revobjs
+
+    def diff(self, to_revision=None, from_revision=None):
+        '''Diff this object returning changes between `from_revision` and
+        `to_revision`.
+
+        @param to_revision: revision to diff to (defaults to the youngest rev)
+        @param from_revision: revision to diff from (defaults to one revision
+        older than to_revision)
+        @return: dict of diffs keyed by field name
+
+        e.g. diff(HEAD, HEAD-2) will show diff of changes made in last 2
+        commits (NB: no changes may have occurred to *this* object in those
+        commits).
+        '''
+        revision_class = self.__revision_class__
+        if to_revision is None:
+            to_revision = Revision.youngest()
+        out = revision_class.query.join('revision').\
+            filter(Revision.timestamp<=to_revision.timestamp).\
+            filter(revision_class.id==self.id).\
+            order_by(Revision.timestamp.desc())
+        to_obj_rev = out.first()
+        if not from_revision:
+            from_revision = Revision.query.\
+                filter(Revision.timestamp<to_revision.timestamp).first()
+        out = revision_class.query.join('revision').\
+            filter(Revision.timestamp<=from_revision.timestamp).\
+            filter(revision_class.id==self.id).\
+            order_by(Revision.timestamp.desc())
+        from_obj_rev = out.first()
+        return self._diff_revision_objects(to_obj_rev, from_obj_rev)
+
+    def _diff_revision_objects(self, to_obj_rev, from_obj_rev):
+        diffs = {}
+        fields = self.revisioned_fields
+
+        for field in fields:
+             values = [getattr(rev, field) for rev in [from_obj_rev, to_obj_rev]]
+             diff = self._differ(values[0], values[1])
+             if diff:
+                  diffs[field] = diff
+        return diffs
+
+    def _differ(self, str_a, str_b):
+        str_a = unicode(str_a)
+        str_b = unicode(str_b)
+        if str_a != str_b:
+            return '\n'.join(difflib.Differ().compare(str_a.split('\n'), str_b.split('\n')))
+        else:
+            return None
+
 
 
 ## --------------------------------------------------------
