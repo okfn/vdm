@@ -12,6 +12,12 @@ open vdm/__init__.py or do (after installation)::
     $ pydoc vdm
 
 
-To run tests use py.test, e.g to run the sqlalchemy tests:
+For Developers
+==============
 
-    $ py.test vdm/sqlalchemy
+To run tests you will need to have a set up a postgresql database with user
+tester and password pass (see vdm/sqlalchemy/demo.py). You can then run the
+tests using nosetests::
+
+    $ nosestests vdm/sqlalchemy
+
