@@ -75,13 +75,6 @@ class Repository(object):
     def init_db(self):
         self.create_db()
         logger.info('Initing DB') 
-        states = self.session.query(State).all()
-        if len(states) == 0:
-            active = State(id=1, name=u'active')
-            deleted = State(id=2, name=u'deleted')
-            self.session.add(active)
-            self.session.add(deleted)
-            self.commit()
         self.session.remove()
 
     def commit(self):
@@ -125,8 +118,7 @@ class Repository(object):
         
         @return: sqlalchemy query object.
         '''
-        active = self.session.query(State).filter_by(name='active').one()
-        return self.session.query(Revision).filter_by(state=active)
+        return self.session.query(Revision).filter_by(state=State.ACTIVE)
 
     def list_changes(self, revision):
         '''List all objects changed by this `revision`.
