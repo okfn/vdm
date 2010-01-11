@@ -105,12 +105,12 @@ class TestMisc:
         assert len(col.foreign_keys) == 1
 
     def test_make_stateful(self):
-        assert 'state_id' in package_table.c
+        assert 'state' in package_table.c
 
     def test_make_revision_table(self):
         assert package_revision_table.name == 'package_revision'
         assert 'revision_id' in package_table.c
-        assert 'state_id' in package_revision_table.c
+        assert 'state' in package_revision_table.c
         assert 'revision_id' in package_revision_table.c
         # very crude ...
         assert len(package_revision_table.c) == len(package_table.c) + 1
@@ -118,12 +118,7 @@ class TestMisc:
         # where this was *not* the case
         base = package_table
         rev = package_revision_table
-        # base = license_table
-        # rev = license_revision_table
-        colname = 'state_id'
         # crude (could be more specific about the fk)
-        assert len(base.c['state_id'].foreign_keys) == 1
-        assert len(rev.c['state_id'].foreign_keys) == 1
         assert len(rev.c['revision_id'].foreign_keys) == 1
         assert rev.c['revision_id'].primary_key
         assert rev.c['id'].primary_key

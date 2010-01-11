@@ -18,7 +18,6 @@ metadata = MetaData(bind=engine)
 
 ## VDM-specific tables
 
-state_table = vdm.sqlalchemy.make_state_table(metadata)
 revision_table = vdm.sqlalchemy.make_revision_table(metadata)
 
 ## Demo tables
@@ -114,7 +113,7 @@ Session = scoped_session(sessionmaker(autoflush=True, transactional=True))
 mapper = Session.mapper
 
 # VDM-specific domain objects
-State = vdm.sqlalchemy.make_State(mapper, state_table)
+State = vdm.sqlalchemy.State
 Revision = vdm.sqlalchemy.make_Revision(mapper, revision_table)
 
 mapper(License, license_table, properties={

@@ -1,13 +1,15 @@
 from datetime import datetime
 import difflib
 import uuid
-make_uuid = lambda: unicode(uuid.uuid4())
-
 import logging
-logger = logging.getLogger('vdm')
+
+from sqlalchemy import *
 
 from sqla import SQLAlchemyMixin
 from sqla import copy_column, copy_table_columns, copy_table
+
+make_uuid = lambda: unicode(uuid.uuid4())
+logger = logging.getLogger('vdm')
 
 ## -------------------------------------
 class SQLAlchemySession(object):
@@ -58,17 +60,12 @@ class SQLAlchemySession(object):
 ## --------------------------------------------------------
 ## VDM-Specific Domain Objects and Tables
 
-# TODO: (?) transition to name based states
-# class STATE:
-#    active = 'active'
-#    deleted = 'deleted'
+# Enumeration
+class State(object):
+    ACTIVE = u'active'
+    DELETED = u'deleted'
+    PENDING = u'pending'
 
-def make_state_table(metadata):
-    state_table = Table('state', metadata,
-            Column('id', Integer, primary_key=True),
-            Column('name', String(8))
-            )
-    return state_table
 
 def make_revision_table(metadata):
     revision_table = Table('revision', metadata,
@@ -76,19 +73,10 @@ def make_revision_table(metadata):
             Column('timestamp', DateTime, default=datetime.now),
             Column('author', String(200)),
             Column('message', UnicodeText),
-            Column('state_id', Integer, ForeignKey('state.id'), default=1)
+            Column('state', UnicodeText, default=State.ACTIVE)
             )
     return revision_table
 
-class State(SQLAlchemyMixin):
-
-    def __repr__(self):
-        return '<State %s>' % self.name
-
-def make_State(mapper, state_table):
-    mapper(State, state_table,
-            order_by=state_table.c.id)
-    return State
 
 class Revision(SQLAlchemyMixin):
     '''A Revision to the Database/Domain Model.
@@ -115,7 +103,6 @@ class Revision(SQLAlchemyMixin):
 
 def make_Revision(mapper, revision_table):
     mapper(Revision, revision_table, properties={
-        'state':relation(State)
         },
         order_by=revision_table.c.timestamp.desc())
     return Revision
@@ -123,15 +110,11 @@ def make_Revision(mapper, revision_table):
 ## --------------------------------------------------------
 ## Table Helpers
 
-from sqlalchemy import *
-
 def make_table_stateful(base_table):
     '''Make a table 'stateful' by adding appropriate state column.'''
     base_table.append_column(
-            # TODO: should probably not use default but should set on object
-            # using StatefulObjectMixin 
-            Column('state_id', Integer, ForeignKey('state.id'), default=1)
-            )
+        Column('state', UnicodeText, default=State.ACTIVE)
+        )
 
 def make_table_revisioned(base_table):
     logger.warn('make_table_revisioned is deprecated: use make_revisioned_table')
@@ -185,26 +168,18 @@ def make_revisioned_table(base_table):
 ## Object Helpers
 
 class StatefulObjectMixin(object):
-
     __stateful__ = True
-    # TODO: complete hack this has got to be set up in some nicer fashion
-    state_obj = State
 
     def delete(self):
-        # HACK: how do we get the real value without having State object
-        # available ...
         logger.debug('Running delete on %s' % self)
-        deleted = self.state_obj.query.filter_by(name='deleted').one()
-        self.state = deleted
+        self.state = State.DELETED
     
     def undelete(self):
-        active = self.state_obj.query.get(1)
-        self.state = active
+        self.state = State.ACTIVE
 
     def is_active(self):
         # also support None in case this object is not yet refreshed ...
-        active = self.state_obj.query.get(1)
-        return self.state is None or self.state == active
+        return self.state is None or self.state == State.ACTIVE
 
 
 class RevisionedObjectMixin(object):
@@ -329,7 +304,6 @@ from sqlalchemy.orm import relation, backref
 def modify_base_object_mapper(base_object, revision_obj, state_obj):
     base_mapper = class_mapper(base_object)
     base_mapper.add_property('revision', relation(revision_obj))
-    base_mapper.add_property('state', relation(state_obj))
 
 def create_object_version(mapper_fn, base_object, rev_table):
     '''Create the Version Domain Object corresponding to base_object.

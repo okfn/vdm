@@ -12,8 +12,6 @@ from tools import Repository
 repo = Repository(metadata, Session,
         versioned_objects = [ Package, License,  PackageTag ]
         )
-ACTIVE = 'active'
-DELETED = 'deleted'
 
 
 class Test0SQLAlchemySession:
@@ -135,8 +133,8 @@ class TestVersioning:
         p1 = Package.query.filter_by(name=self.name1).one()
         p2 = Package.query.filter_by(name=self.name2).one()
         assert p1.state
-        assert p1.state.name == ACTIVE
-        assert p2.state.name == DELETED
+        assert p1.state == State.ACTIVE
+        assert p2.state == State.DELETED
 
     def test_versioning_0(self):
         p1 = Package.query.filter_by(name=self.name1).one()
@@ -155,7 +153,7 @@ class TestVersioning:
         p2 = Package.query.filter_by(name=self.name2).one()
         rev1 = Revision.query.get(self.rev1_id)
         p2r1 = p2.get_as_of(rev1)
-        assert p2r1.state.name == ACTIVE
+        assert p2r1.state == State.ACTIVE
 
     def test_versioning_traversal_fks(self):
         p1 = Package.query.filter_by(name=self.name1).one()
@@ -182,7 +180,7 @@ class TestVersioning:
     
     def test_revision_has_state(self):
         rev1 = Revision.query.get(self.rev1_id)
-        assert rev1.state.name == ACTIVE
+        assert rev1.state == State.ACTIVE
 
     def test_diff(self):
         p1 = Package.query.filter_by(name=self.name1).one()
@@ -257,13 +255,13 @@ class TestStatefulVersioned:
         ptrevs = PackageTagRevision.query.filter_by(revision_id=rev1.id).all()
         assert len(ptrevs) == 2
         for pt in ptrevs:
-            assert pt.state.name == ACTIVE
+            assert pt.state == State.ACTIVE
 
         rev2 = Revision.query.get(self.rev2_id)
         ptrevs = PackageTagRevision.query.filter_by(revision_id=rev2.id).all()
         assert len(ptrevs) == 2
         for pt in ptrevs:
-            assert pt.state.name == DELETED
+            assert pt.state == State.DELETED
     
     # test should be higher up but need at least 3 revisions for problem to
     # show up
