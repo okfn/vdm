@@ -111,7 +111,7 @@ class Repository(object):
     def youngest_revision(self):
         '''Get the youngest (most recent) revision.'''
         q = self.history()
-        q = q.order_by(Revision.id.desc())
+        q = q.order_by(Revision.timestamp.desc())
         return q.first()
         
     def history(self):
