@@ -67,12 +67,12 @@ class TestVersioning:
         session.begin()
         rev2 = Revision()
         vdm.sqlalchemy.SQLAlchemySession.set_revision(session, rev2)
-        outlic1 = Session.query(Session)(License).filter_by(name='blah').first()
-        outlic2 = Session.query(Session)(License).filter_by(name='foo').first()
+        outlic1 = Session.query(License).filter_by(name='blah').first()
+        outlic2 = Session.query(License).filter_by(name='foo').first()
         outlic2.open = False
         session.add_all([rev2,outlic1,outlic2])
-        outp1 = Session.query(Session)(Package).filter_by(name=self.name1).one()
-        outp2 = Session.query(Session)(Package).filter_by(name=self.name2).one()
+        outp1 = Session.query(Package).filter_by(name=self.name1).one()
+        outp2 = Session.query(Package).filter_by(name=self.name2).one()
         outp1.title = self.title2
         outp1.notes = self.notes2
         outp1.license = outlic2
@@ -98,7 +98,7 @@ class TestVersioning:
         assert revs[0].timestamp > revs[1].timestamp
 
     def test_revision_youngest(self):
-        rev = Revision.youngest()
+        rev = Revision.youngest(Session)
         assert rev.timestamp == self.ts2
 
     def test_basic(self):
@@ -118,30 +118,30 @@ class TestVersioning:
 
     def test_basic_2(self):
         # should be at HEAD (i.e. rev2) by default 
-        p1 = Session.query(Session)(Package).filter_by(name=self.name1).one()
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
         assert p1.license.open == False
         assert p1.revision.timestamp == self.ts2
         # assert p1.tags == []
         assert len(p1.tags) == 1
 
     def test_basic_continuity(self):
-        p1 = Session.query(Session)(Package).filter_by(name=self.name1).one()
-        pr1 = Session.query(Session)(PackageRevision).filter_by(name=self.name1).first()
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
+        pr1 = Session.query(PackageRevision).filter_by(name=self.name1).first()
         table = class_mapper(PackageRevision).mapped_table
         print table.c.keys()
         print pr1.continuity_id
         assert pr1.continuity == p1
 
     def test_basic_state(self):
-        p1 = Session.query(Session)(Package).filter_by(name=self.name1).one()
-        p2 = Session.query(Session)(Package).filter_by(name=self.name2).one()
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
+        p2 = Session.query(Package).filter_by(name=self.name2).one()
         assert p1.state
         assert p1.state == State.ACTIVE
         assert p2.state == State.DELETED
 
     def test_versioning_0(self):
-        p1 = Session.query(Session)(Package).filter_by(name=self.name1).one()
-        rev1 = Session.query(Session)(Revision).get(self.rev1_id)
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
+        rev1 = Session.query(Revision).get(self.rev1_id)
         p1r1 = p1.get_as_of(rev1)
         assert p1r1.continuity == p1
 
@@ -216,6 +216,7 @@ class TestStatefulVersioned:
         t2 = Tag(name='geo2')
         p1.tags.append(t1)
         p1.tags.append(t2)
+        Session.add_all([rev1,p1,t1,t2])
         Session.commit()
         self.rev1_id = rev1.id
         Session.remove()
@@ -312,6 +313,7 @@ class TestStatefulVersioned2:
         p1 = Package(name=self.name1)
         t1 = Tag(name='geo')
         p1.tags.append(t1)
+        Session.add_all([rev1,p1,t1])
         Session.commit()
         self.rev1_id = rev1.id
         Session.remove()

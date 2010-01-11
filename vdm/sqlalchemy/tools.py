@@ -104,6 +104,7 @@ class Repository(object):
         <http://groups.google.com/group/sqlalchemy/browse_thread/thread/a54ce150b33517db/17587ca675ab3674>
         '''
         rev = Revision()                                      
+        self.session.add(rev)
         SQLAlchemySession.set_revision(self.session, rev)             
         return rev
 

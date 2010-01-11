@@ -88,16 +88,12 @@ class Revision(SQLAlchemyMixin):
     # until actual save ...)
 
     @classmethod
-    def youngest(self, session=None):
+    def youngest(self, session):
         '''Get the youngest (most recent) revision.
 
         If session is not provided assume there is a contextual session.
         '''
-        if session:
-            q = session.query(self.__class__)
-        else: # this depends upon having a contextual session
-            q = self.query
-        # order by is already set by mapper
+        q = session.query(self)
         return q.first()
 
 
@@ -258,7 +254,7 @@ class RevisionedObjectMixin(object):
         sess = object_session(self)
         revision_class = self.__revision_class__
         if to_revision is None:
-            to_revision = Revision.youngest()
+            to_revision = Revision.youngest(sess)
         out = sess.query(revision_class).join('revision').\
             filter(Revision.timestamp<=to_revision.timestamp).\
             filter(revision_class.id==self.id).\
@@ -471,10 +467,11 @@ class Revisioner(MapperExtension):
         # database which requires we use *column* values. In particular, we
         # need revision_id not revision object to create revision_object
         # properly!
-        if not current_rev.id: # not yet flushed ...
+        assert current_rev.id, 'Must have a revision.id to create object revision'
+        # if not current_rev.id: # not yet flushed ...
             # Now that we are using uuids, this is ok! Otherwise we would have
             # *serious* problems ...
-            current_rev.id = make_uuid()
+            # current_rev.id = make_uuid()
         instance.revision_id = current_rev.id
         instance.revision = current_rev
 
