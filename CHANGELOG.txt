@@ -1,11 +1,14 @@
 v0.6 ??
 =======
 
-  * ? Convert State from object to an enumeration
-  * SQLAlchemy v0.5
+  * Diffing versioned objects 
+  * Backwards incompatible changes: revision id changed to UUID from integer
+    * For an example upgrade script for client systems see
+      http://knowledgeforge.net/ckan/hg/file/tip/ckan/migration/versions/008_update_vdm_ids.py
   * ? Support for non-integer primary keys (and keys not named 'id')
   * ? Support for composite primary keys
-  * diffing versioned objects 
+  * ? Convert State from object to an enumeration
+  * ? SQLAlchemy v0.5
 
 v0.5 2009-09-17
 ===============
