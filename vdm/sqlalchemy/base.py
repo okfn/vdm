@@ -194,11 +194,15 @@ class StatefulObjectMixin(object):
         # HACK: how do we get the real value without having State object
         # available ...
         logger.debug('Running delete on %s' % self)
-        deleted = self.state_obj.query.filter_by(name='deleted').one()
+        sess = object_session(self)
+        deleted = sess.query(self.state_obj).filter_by(name='deleted').one()
         self.state = deleted
     
     def undelete(self):
-        active = self.state_obj.query.get(1)
+        sess = object_session(self)
+        # know active has id 1
+        print self
+        active = sess.query(self.state_obj).get(1)
         self.state = active
 
     def is_active(self):
@@ -247,7 +251,7 @@ class RevisionedObjectMixin(object):
             revision_class = self.__revision_class__
             # TODO: when dealing with multi-col pks will need to update this
             # (or just use continuity)
-            out = revision_class.query.join('revision').\
+            out = sess.query(revision_class).join('revision').\
                 filter(
                     Revision.timestamp <= revision.timestamp
                 ).\
@@ -280,18 +284,19 @@ class RevisionedObjectMixin(object):
         commits (NB: no changes may have occurred to *this* object in those
         commits).
         '''
+        sess = object_session(self)
         revision_class = self.__revision_class__
         if to_revision is None:
             to_revision = Revision.youngest()
-        out = revision_class.query.join('revision').\
+        out = sess.query(revision_class).join('revision').\
             filter(Revision.timestamp<=to_revision.timestamp).\
             filter(revision_class.id==self.id).\
             order_by(Revision.timestamp.desc())
         to_obj_rev = out.first()
         if not from_revision:
-            from_revision = Revision.query.\
+            from_revision = sess.query(Revision).\
                 filter(Revision.timestamp<to_revision.timestamp).first()
-        out = revision_class.query.join('revision').\
+        out = sess.query(revision_class).join('revision').\
             filter(Revision.timestamp<=from_revision.timestamp).\
             filter(revision_class.id==self.id).\
             order_by(Revision.timestamp.desc())
@@ -490,7 +495,16 @@ class Revisioner(MapperExtension):
         # set revision to ensure object behaves how it should (e.g. we use
         # instance.revision in after_update)
         assert current_rev, 'No revision is currently set for this Session'
-        assert current_rev.id
+        # We need the id unfortunately for this all to work
+        # Why? We cannot created new sqlachemy objects in here (as they won't
+        # get saved). This means we have to created revision_object directly in
+        # database which requires we use *column* values. In particular, we
+        # need revision_id not revision object to create revision_object
+        # properly!
+        if not current_rev.id: # not yet flushed ...
+            # Now that we are using uuids, this is ok! Otherwise we would have
+            # *serious* problems ...
+            current_rev.id = make_uuid()
         instance.revision_id = current_rev.id
         instance.revision = current_rev
 
@@ -502,7 +516,7 @@ class Revisioner(MapperExtension):
         ctyval = getattr(instance, colname)
         values = table.select(ctycol==ctyval).execute().fetchone() 
         if values is None: # object not yet created
-            logger.debug('check_real_change: True')
+            logger.debug('check_real_change: True (object not yet created)')
             return True
 
         # (Based on Elixir's solution to this problem)

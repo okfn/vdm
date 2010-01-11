@@ -69,15 +69,18 @@ class Repository(object):
     def rebuild_db(self):
         logger.info('Rebuilding DB')
         self.clean_db()
+        self.session.remove()
         self.init_db()
 
     def init_db(self):
         self.create_db()
         logger.info('Initing DB') 
-        states = State.query.all()
+        states = self.session.query(State).all()
         if len(states) == 0:
-            ACTIVE = State(id=1, name='active').name
-            DELETED = State(id=2, name='deleted').name
+            active = State(id=1, name=u'active')
+            deleted = State(id=2, name=u'deleted')
+            self.session.add(active)
+            self.session.add(deleted)
             self.commit()
         self.session.remove()
 
@@ -122,8 +125,8 @@ class Repository(object):
         
         @return: sqlalchemy query object.
         '''
-        active = State.query.filter_by(name='active').one()
-        return Revision.query.filter_by(state=active)
+        active = self.session.query(State).filter_by(name='active').one()
+        return self.session.query(Revision).filter_by(state=active)
 
     def list_changes(self, revision):
         '''List all objects changed by this `revision`.
@@ -133,7 +136,7 @@ class Repository(object):
         results = {}
         for o in self.versioned_objects:
             revobj = o.__revision_class__
-            items = revobj.query.filter_by(revision=revision).all()
+            items = self.session.query(revobj).filter_by(revision=revision).all()
             results[o] = items
         return results
 
@@ -162,12 +165,12 @@ class Repository(object):
         SQLAlchemySession.setattr(self.session, 'revisioning_disabled', True)
         for o in self.versioned_objects:
             revobj = o.__revision_class__
-            items = revobj.query.filter_by(revision=revision).all()
+            items = self.session.query(revobj).filter_by(revision=revision).all()
             for item in items:
                 continuity = item.continuity
 
                 if continuity.revision == revision: # need to change continuity
-                    trevobjs = revobj.query.join('revision').  filter(
+                    trevobjs = self.session.query(revobj).join('revision').  filter(
                             revobj.continuity==continuity
                             ).order_by(Revision.timestamp.desc()).limit(2).all()
                     if len(trevobjs) == 0:

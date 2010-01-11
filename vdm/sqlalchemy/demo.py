@@ -111,7 +111,8 @@ from sqlalchemy.orm import relation, backref
 # this is the more testing one ...
 Session = scoped_session(sessionmaker(autoflush=True, transactional=True))
 
-mapper = Session.mapper
+# mapper = Session.mapper
+from sqlalchemy.orm import mapper
 
 # VDM-specific domain objects
 State = vdm.sqlalchemy.make_State(mapper, state_table)

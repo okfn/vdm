@@ -55,6 +55,7 @@ class TestVersioning:
         lic2 = License(name='foo', open=True)
         p1 = Package(name=self.name1, title=self.title1, license=lic1, notes=self.notes1)
         p2 = Package(name=self.name2, title=self.title1, license=lic1)
+        session.add_all([rev1,lic1,lic2,p1,p2])
 
         logger.debug('***** Committing/Flushing Rev 1')
         session.commit()
@@ -68,15 +69,17 @@ class TestVersioning:
         session.begin()
         rev2 = Revision()
         vdm.sqlalchemy.SQLAlchemySession.set_revision(session, rev2)
-        outlic1 = License.query.filter_by(name='blah').first()
-        outlic2 = License.query.filter_by(name='foo').first()
+        outlic1 = Session.query(License).filter_by(name='blah').first()
+        outlic2 = Session.query(License).filter_by(name='foo').first()
         outlic2.open = False
-        outp1 = Package.query.filter_by(name=self.name1).one()
-        outp2 = Package.query.filter_by(name=self.name2).one()
+        session.add_all([rev2,outlic1,outlic2])
+        outp1 = Session.query(Package).filter_by(name=self.name1).one()
+        outp2 = Session.query(Package).filter_by(name=self.name2).one()
         outp1.title = self.title2
         outp1.notes = self.notes2
         outp1.license = outlic2
         t1 = Tag(name='geo')
+        session.add_all([outp1,outp2,t1])
         outp1.tags = [t1]
         outp2.delete()
         # session.flush()
@@ -91,7 +94,7 @@ class TestVersioning:
         Session.remove()
 
     def test_revisions_exist(self):
-        revs = Revision.query.all()
+        revs = Session.query(Revision).all()
         assert len(revs) == 2
         # also check order (youngest first)
         assert revs[0].timestamp > revs[1].timestamp
@@ -101,14 +104,14 @@ class TestVersioning:
         assert rev.timestamp == self.ts2
 
     def test_basic(self):
-        assert License.query.count() == 2, License.query.count()
-        assert Package.query.count() == 2, Package.query.count()
+        assert Session.query(License).count() == 2, Session.query(License).count()
+        assert Session.query(Package).count() == 2, Session.query(Package).count()
         assert 'revision_id' in LicenseRevision.c
-        assert LicenseRevision.query.count() == 3, LicenseRevision.query.count()
-        assert PackageRevision.query.count() == 4, PackageRevision.query.count()
+        assert Session.query(LicenseRevision).count() == 3, Session.query(LicenseRevision).count()
+        assert Session.query(PackageRevision).count() == 4, Session.query(PackageRevision).count()
 
     def test_all_revisions(self):
-        p1 = Package.query.filter_by(name=self.name1).one()
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
         assert len(p1.all_revisions) == 2
         # problem here is that it might pass even if broken because ordering of
         # uuid ids is 'right' 
@@ -117,62 +120,62 @@ class TestVersioning:
 
     def test_basic_2(self):
         # should be at HEAD (i.e. rev2) by default 
-        p1 = Package.query.filter_by(name=self.name1).one()
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
         assert p1.license.open == False
         assert p1.revision.timestamp == self.ts2
         # assert p1.tags == []
         assert len(p1.tags) == 1
 
     def test_basic_continuity(self):
-        p1 = Package.query.filter_by(name=self.name1).one()
-        pr1 = PackageRevision.query.filter_by(name=self.name1).first()
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
+        pr1 = Session.query(PackageRevision).filter_by(name=self.name1).first()
         table = class_mapper(PackageRevision).mapped_table
         print table.c.keys()
         print pr1.continuity_id
         assert pr1.continuity == p1
 
     def test_basic_state(self):
-        p1 = Package.query.filter_by(name=self.name1).one()
-        p2 = Package.query.filter_by(name=self.name2).one()
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
+        p2 = Session.query(Package).filter_by(name=self.name2).one()
         assert p1.state
         assert p1.state.name == ACTIVE
         assert p2.state.name == DELETED
 
     def test_versioning_0(self):
-        p1 = Package.query.filter_by(name=self.name1).one()
-        rev1 = Revision.query.get(self.rev1_id)
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
+        rev1 = Session.query(Revision).get(self.rev1_id)
         p1r1 = p1.get_as_of(rev1)
         assert p1r1.continuity == p1
 
     def test_versioning_1(self):
-        p1 = Package.query.filter_by(name=self.name1).one()
-        rev1 = Revision.query.get(self.rev1_id)
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
+        rev1 = Session.query(Revision).get(self.rev1_id)
         p1r1 = p1.get_as_of(rev1)
         assert p1r1.name == self.name1
         assert p1r1.title == self.title1
 
     def test_traversal_normal_fks_and_state_at_same_time(self):
-        p2 = Package.query.filter_by(name=self.name2).one()
-        rev1 = Revision.query.get(self.rev1_id)
+        p2 = Session.query(Package).filter_by(name=self.name2).one()
+        rev1 = Session.query(Revision).get(self.rev1_id)
         p2r1 = p2.get_as_of(rev1)
         assert p2r1.state.name == ACTIVE
 
     def test_versioning_traversal_fks(self):
-        p1 = Package.query.filter_by(name=self.name1).one()
-        rev1 = Revision.query.get(self.rev1_id)
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
+        rev1 = Session.query(Revision).get(self.rev1_id)
         p1r1 = p1.get_as_of(rev1)
         assert p1r1.license.open == True
 
     def test_versioning_m2m_1(self):
-        p1 = Package.query.filter_by(name=self.name1).one()
-        rev1 = Revision.query.get(self.rev1_id)
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
+        rev1 = Session.query(Revision).get(self.rev1_id)
         ptag = p1.package_tags[0]
         # does not exist
         assert ptag.get_as_of(rev1) == None
 
     def test_versioning_m2m(self):
-        p1 = Package.query.filter_by(name=self.name1).one()
-        rev1 = Revision.query.get(self.rev1_id)
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
+        rev1 = Session.query(Revision).get(self.rev1_id)
         p1r1 = p1.get_as_of(rev1)
         assert len(p1.tags_active) == 0
         # NB: deleted includes tags that were non-existent
@@ -181,11 +184,11 @@ class TestVersioning:
         assert len(p1r1.tags) == 0
     
     def test_revision_has_state(self):
-        rev1 = Revision.query.get(self.rev1_id)
+        rev1 = Session.query(Revision).get(self.rev1_id)
         assert rev1.state.name == ACTIVE
 
     def test_diff(self):
-        p1 = Package.query.filter_by(name=self.name1).one()
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
         pr2, pr1 = p1.all_revisions
         # pr1, pr2 = prs[::-1]
         
@@ -222,7 +225,7 @@ class TestStatefulVersioned:
         # now remove those tags
         logger.debug('====== start Revision 2')
         rev2 = repo.new_revision()
-        newp1 = Package.query.filter_by(name=self.name1).one()
+        newp1 = Session.query(Package).filter_by(name=self.name1).one()
         # either one works
         newp1.tags = []
         # newp1.tags_active.clear()
@@ -234,9 +237,9 @@ class TestStatefulVersioned:
         # now add one of them back
         logger.debug('====== start Revision 3')
         rev3 = repo.new_revision()
-        newp1 = Package.query.filter_by(name=self.name1).one()
+        newp1 = Session.query(Package).filter_by(name=self.name1).one()
         self.tagname1 = 'geo'
-        t1 = Tag.query.filter_by(name=self.tagname1).one()
+        t1 = Session.query(Tag).filter_by(name=self.tagname1).one()
         assert t1
         newp1.tags.append(t1)
         repo.commit_and_remove()
@@ -246,21 +249,21 @@ class TestStatefulVersioned:
         Session.remove()
 
     def test_0_remove_and_readd_m2m(self):
-        p1 = Package.query.filter_by(name=self.name1).one()
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
         assert len(p1.package_tags) == 2, p1.package_tags
         assert len(p1.tags_active) == 1, p1.tags_active
         assert len(p1.tags) == 1
         Session.remove()
 
     def test_1_underlying_is_right(self):
-        rev1 = Revision.query.get(self.rev1_id)
-        ptrevs = PackageTagRevision.query.filter_by(revision_id=rev1.id).all()
+        rev1 = Session.query(Revision).get(self.rev1_id)
+        ptrevs = Session.query(PackageTagRevision).filter_by(revision_id=rev1.id).all()
         assert len(ptrevs) == 2
         for pt in ptrevs:
             assert pt.state.name == ACTIVE
 
-        rev2 = Revision.query.get(self.rev2_id)
-        ptrevs = PackageTagRevision.query.filter_by(revision_id=rev2.id).all()
+        rev2 = Session.query(Revision).get(self.rev2_id)
+        ptrevs = Session.query(PackageTagRevision).filter_by(revision_id=rev2.id).all()
         assert len(ptrevs) == 2
         for pt in ptrevs:
             assert pt.state.name == DELETED
@@ -268,18 +271,18 @@ class TestStatefulVersioned:
     # test should be higher up but need at least 3 revisions for problem to
     # show up
     def test_2_get_as_of(self):
-        p1 = Package.query.filter_by(name=self.name1).one()
-        rev2 = Revision.query.get(self.rev2_id)
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
+        rev2 = Session.query(Revision).get(self.rev2_id)
         # should be 2 deleted and 1 as None
         ptrevs = [ pt.get_as_of(rev2) for pt in p1.package_tags ]
         print ptrevs
-        print PackageTagRevision.query.all()
+        print Session.query(PackageTagRevision).all()
         assert ptrevs[0].revision_id == rev2.id
 
     def test_3_remove_and_readd_m2m_2(self):
         num_package_tags = 2
-        rev1 = Revision.query.get(self.rev1_id)
-        p1 = Package.query.filter_by(name=self.name1).one()
+        rev1 = Session.query(Revision).get(self.rev1_id)
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
         p1rev = p1.get_as_of(rev1)
         # NB: relations on revision object proxy to continuity
         # (though with get_as_of revision set)
@@ -287,8 +290,8 @@ class TestStatefulVersioned:
         assert len(p1rev.tags) == 2
         Session.remove()
 
-        rev2 = Revision.query.get(self.rev2_id)
-        p1 = Package.query.filter_by(name=self.name1).one()
+        rev2 = Session.query(Revision).get(self.rev2_id)
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
         p2rev = p1.get_as_of(rev2)
         assert p2rev.__class__ == PackageRevision
         assert len(p2rev.package_tags) == num_package_tags
@@ -323,20 +326,20 @@ class TestStatefulVersioned2:
         Session.remove()
 
     def _test_package_tags(self, check_all_pkg_tags=True):
-        p1 = Package.query.filter_by(name=self.name1).one()
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
         assert len(p1.package_tags) == 2, p1.package_tags
-        all_pkg_tags = PackageTag.query.all()
+        all_pkg_tags = Session.query(PackageTag).all()
         if check_all_pkg_tags:
             assert len(all_pkg_tags) == 2
 
     def _test_tags(self):
-        p1 = Package.query.filter_by(name=self.name1).one()
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
         assert len(p1.tags) == 2, p1.tags
 
     def test_1(self):
         rev2 = repo.new_revision()
-        newp1 = Package.query.filter_by(name=self.name1).one()
-        t1 = Tag.query.filter_by(name='geo').one()
+        newp1 = Session.query(Package).filter_by(name=self.name1).one()
+        t1 = Session.query(Tag).filter_by(name='geo').one()
         t2 = Tag(name='geo2')
         newp1.tags = [ t1, t2 ]
         repo.commit_and_remove()
@@ -346,8 +349,8 @@ class TestStatefulVersioned2:
     
     def test_2(self):
         rev2 = repo.new_revision()
-        newp1 = Package.query.filter_by(name=self.name1).one()
-        t1 = Tag.query.filter_by(name='geo').one()
+        newp1 = Session.query(Package).filter_by(name=self.name1).one()
+        t1 = Session.query(Tag).filter_by(name='geo').one()
         t2 = Tag(name='geo2')
         print '**** setting tags'
         newp1.tags[:] = [ t1, t2 ]
@@ -365,8 +368,8 @@ class TestStatefulVersioned2:
 
     def test_3(self):
         rev2 = repo.new_revision()
-        newp1 = Package.query.filter_by(name=self.name1).one()
-        t1 = Tag.query.filter_by(name='geo').one()
+        newp1 = Session.query(Package).filter_by(name=self.name1).one()
+        t1 = Session.query(Tag).filter_by(name='geo').one()
         t2 = Tag(name='geo2')
         newp1.tags[0] = t1
         newp1.tags.append(t2)
@@ -377,8 +380,8 @@ class TestStatefulVersioned2:
 
     def test_4(self):
         rev2 = repo.new_revision()
-        newp1 = Package.query.filter_by(name=self.name1).one()
-        t1 = Tag.query.filter_by(name='geo').one()
+        newp1 = Session.query(Package).filter_by(name=self.name1).one()
+        t1 = Session.query(Tag).filter_by(name='geo').one()
         t2 = Tag(name='geo2')
         newp1.tags = [ t1, t2 ]
         newp1.tags[0] = t1
@@ -408,14 +411,16 @@ class TestRevertAndPurge:
         self.name1 = 'anna'
         p1 = Package(name=self.name1)
         p2 = Package(name='blahblah')
+        Session.add_all([rev1,p1,p2])
         repo.commit_and_remove()
 
         self.name2 = 'warandpeace'
         self.lname = 'testlicense'
         rev2 = repo.new_revision()
-        p1 = Package.query.filter_by(name=self.name1).one()
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
         p1.name = self.name2
         l1 = License(name=self.lname)
+        Session.add_all([rev2,p1,l1])
         repo.commit()
         self.rev2id = rev2.id
         Session.remove()
@@ -426,14 +431,14 @@ class TestRevertAndPurge:
         repo.rebuild_db()
 
     def test_basics(self):
-        revs = Revision.query.all()
+        revs = Session.query(Revision).all()
         assert len(revs) == 2
-        p1 = Package.query.filter_by(name=self.name2).one()
+        p1 = Session.query(Package).filter_by(name=self.name2).one()
         assert p1.name == self.name2
-        assert len(Package.query.all()) == 2
+        assert len(Session.query(Package).all()) == 2
 
     def test_list_changes(self):
-        rev2 = Revision.query.get(self.rev2id)
+        rev2 = Session.query(Revision).get(self.rev2id)
         out = repo.list_changes(rev2)
         assert len(out) == 3
         assert len(out[Package]) == 1, out
@@ -442,15 +447,15 @@ class TestRevertAndPurge:
     def test_purge_revision(self):
         logger.debug('BEGINNING PURGE REVISION')
         Session.remove()
-        rev2 = Revision.query.get(self.rev2id)
+        rev2 = Session.query(Revision).get(self.rev2id)
         repo.purge_revision(rev2)
-        revs = Revision.query.all()
+        revs = Session.query(Revision).all()
         assert len(revs) == 1
-        p1 = Package.query.filter_by(name=self.name1).first()
+        p1 = Session.query(Package).filter_by(name=self.name1).first()
         assert p1 is not None
-        assert len(License.query.all()) == 0
-        pkgs = Package.query.all()
+        assert len(Session.query(License).all()) == 0
+        pkgs = Session.query(Package).all()
         assert len(pkgs) == 2, pkgrevs
-        pkgrevs = PackageRevision.query.all()
+        pkgrevs = Session.query(PackageRevision).all()
         assert len(pkgrevs) == 2, pkgrevs
 

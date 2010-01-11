@@ -14,9 +14,9 @@ class TestRepository:
         self.repo.session.remove()
         self.repo.clean_db()
         self.repo.create_db()
-        assert len(State.query.all()) == 0
+        assert len(Session.query(State).all()) == 0
         self.repo.init_db()
-        assert len(State.query.all()) == 2
+        assert len(Session.query(State).all()) == 2
 
     def test_new_revision(self):
         self.repo.session.remove()

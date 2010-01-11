@@ -3,6 +3,10 @@
 import sqlalchemy
 
 class SQLAlchemyMixin(object):
+    def __init__(self, **kw):
+        for k, v in kw.iteritems():
+            setattr(self, k, v)
+
     def __str__(self):
         repr = u'<%s' % self.__class__.__name__
         table = sqlalchemy.orm.class_mapper(self.__class__).mapped_table
