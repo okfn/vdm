@@ -65,7 +65,7 @@ class State(object):
     ACTIVE = u'active'
     DELETED = u'deleted'
     PENDING = u'pending'
-
+    all = (ACTIVE, DELETED, PENDING)
 
 def make_revision_table(metadata):
     revision_table = Table('revision', metadata,
