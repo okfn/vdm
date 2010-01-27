@@ -193,5 +193,5 @@ both of the related objects are versioned.
   3. This change is notified to a moderator
   4. A moderator either allows or disallows the change
 '''
-__version__ = '0.6a'
+__version__ = '0.6b'
 __description__ = 'A versioned domain model framework.'
