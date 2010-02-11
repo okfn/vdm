@@ -1,14 +1,18 @@
-v0.6 ??
-=======
+HEAD
+====
 
-  * Diffing versioned objects 
-  * Backwards incompatible changes: revision id changed to UUID from integer
+v0.6 2010-01-25
+===============
+
+  * Support for non-integer primary keys
+  * Diffing revisioned/versioned objects via diff(to_revision, from_revision) method
+  * **BREAKING CHANGE**: revision id changed to UUID from integer
     * For an example upgrade script for client systems see
       http://knowledgeforge.net/ckan/hg/file/tip/ckan/migration/versions/008_update_vdm_ids.py
-    * Convert State from object to an enumeration
-  * ? Support for non-integer primary keys (and keys not named 'id')
-  * ? Support for composite primary keys
-  * ? SQLAlchemy v0.5
+  * **BREAKING CHANGE**: Convert State from object to an enumeration
+    * For an example upgrade script for client systems see
+      http://knowledgeforge.net/ckan/hg/file/d3a25bb4eb1b/ckan/migration/versions/015_remove_state_object.py
+  * Various minor bugfixes and improvements especially to `Repository`
 
 v0.5 2009-09-17
 ===============

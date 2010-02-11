@@ -17,7 +17,7 @@ production systems since v0.2 (May 2008).
 Copyright and License
 =====================
 
-(c) 2007-2009 The Open Knowledge Foundation
+(c) 2007-2010 The Open Knowledge Foundation
 
 Licensed under the MIT license:
 
@@ -193,5 +193,5 @@ both of the related objects are versioned.
   3. This change is notified to a moderator
   4. A moderator either allows or disallows the change
 '''
-__version__ = '0.6b'
+__version__ = '0.6'
 __description__ = 'A versioned domain model framework.'
