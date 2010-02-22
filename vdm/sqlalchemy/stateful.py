@@ -436,6 +436,7 @@ class DeferredProperty(object):
         raise NotImplementedError()
 
 
+from sqlalchemy import __version__ as sqla_version
 import sqlalchemy.ext.associationproxy
 import weakref
 # write our own assoc proxy which excludes scalar support and therefore calls
@@ -443,22 +444,8 @@ import weakref
 # collection 
 class OurAssociationProxy(sqlalchemy.ext.associationproxy.AssociationProxy):
 
-    def __get__(self, obj, class_):
-        if obj is None:
-            self.owning_class = class_
-            return
-        try:
-            return getattr(obj, self.key)
-        except AttributeError:
-            proxy = self._new(self._lazy_collection(weakref.ref(obj)))
-            setattr(obj, self.key, proxy)
-            return proxy
-    
-    def __set__(self, obj, values):
-        proxy = self.__get__(obj, None)
-        if proxy is not values:
-            proxy.clear()
-            self._set(proxy, values)
+    def _target_is_scalar(self):
+        return False
 
 
 # TODO: 2009-07-24 support dict collections

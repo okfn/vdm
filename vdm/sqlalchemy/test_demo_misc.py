@@ -4,15 +4,9 @@ from demo import *
 from base import *
 
 class TestMisc:
-
-    @classmethod
-    def setup_class(self):
-        Session.begin()
-
     @classmethod
     def teardown_class(self):
-        Session.rollback()
-        Session.remove()
+        repo.rebuild_db()
 
     def test_column_create(self):
         tabxyz = Table('xyz', metadata,

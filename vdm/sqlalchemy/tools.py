@@ -25,8 +25,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import ScopedSession
 from sqlalchemy.orm import class_mapper
 from sqlalchemy.orm import object_session
+from sqlalchemy import __version__ as sqla_version
 
 from base import SQLAlchemySession, State, Revision
+
 
 class Repository(object):
     '''Manage repository-wide type changes for versioned domain models.
@@ -50,9 +52,13 @@ class Repository(object):
         self.have_scoped_session = isinstance(self.session, ScopedSession)
         self.transactional = False 
         if self.have_scoped_session:
-            self.transactional = self.session().transactional
+            tmpsess = self.session()
         else:
-            self.transactional = self.session.transactional
+            tmpsess = self.session
+        if sqla_version > '0.4.99':
+            self.transactional = not tmpsess.autocommit
+        else:    
+            self.transactional = tmpsess.transactional
         if self.dburi:
             engine = create_engine(dburi)
             self.metadata.bind = engine 

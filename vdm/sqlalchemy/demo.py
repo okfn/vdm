@@ -8,6 +8,7 @@ import logging
 logger = logging.getLogger('vdm')
 
 from sqlalchemy import *
+from sqlalchemy import __version__ as sqla_version
 # from sqlalchemy import create_engine
 
 import vdm.sqlalchemy
@@ -108,7 +109,10 @@ from sqlalchemy.orm import relation, backref
 # both options now work
 # Session = scoped_session(sessionmaker(autoflush=False, transactional=True))
 # this is the more testing one ...
-Session = scoped_session(sessionmaker(autoflush=True, transactional=True))
+if sqla_version <= '0.4.99':
+    Session = scoped_session(sessionmaker(autoflush=True, transactional=True))
+else:
+    Session = scoped_session(sessionmaker(autoflush=True, autocommit=False))
 
 # mapper = Session.mapper
 from sqlalchemy.orm import mapper
@@ -161,4 +165,12 @@ from base import add_stateful_versioned_m2m
 vdm.sqlalchemy.add_stateful_versioned_m2m(Package, PackageTag, 'tags', 'tag',
         'package_tags')
 vdm.sqlalchemy.add_stateful_versioned_m2m_on_version(PackageRevision, 'tags')
+
+## ------------------------
+## Repository helper object
+
+from tools import Repository
+repo = Repository(metadata, Session,
+        versioned_objects = [ Package, License,  PackageTag ]
+        )
 
