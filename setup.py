@@ -12,7 +12,7 @@ setup(
 
     # metadata for upload to PyPI
     author = "Rufus Pollock (Open Knowledge Foundation)",
-    author_email = "rufus@rufuspollock.org",
+    author_email = "info@okfn.org",
     description = __description__,
     long_description = __long_description__,
     license = "MIT",
