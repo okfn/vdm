@@ -1,6 +1,12 @@
 HEAD
 ====
 
+v0.7 2010-??-??
+===============
+
+  * Support for SQLALchemy v0.5
+  * Improved diff support
+
 v0.6 2010-01-25
 ===============
 

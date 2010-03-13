@@ -68,7 +68,10 @@ package_tag_revision_table = vdm.sqlalchemy.make_revisioned_table(package_tag_ta
 ## Mapped classes
 
         
-class License(vdm.sqlalchemy.RevisionedObjectMixin):
+class License(vdm.sqlalchemy.RevisionedObjectMixin,
+    vdm.sqlalchemy.StatefulObjectMixin,
+    vdm.sqlalchemy.SQLAlchemyMixin
+    ):
     def __init__(self, **kwargs):
         for k,v in kwargs.items():
             setattr(self, k, v)

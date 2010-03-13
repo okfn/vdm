@@ -1,5 +1,4 @@
-'''
-About
+'''About
 =====
 
 Versioned Domain Model (vdm) is a package which allows you to 'version' your
@@ -8,10 +7,14 @@ subversion allow you version your code. In particular, versioned domain model
 versions a complete model and not just individual domain objects (for more on
 this distinction see below).
 
-At present the package is provided as an extension to SQLAlchemy and SQLObject.
+At present the package is provided as an extension to SQLAlchemy (tested
+against v0.4 and v0.5).
 
-The library is pretty stable and robust and has been used by the authors in
-production systems since v0.2 (May 2008).
+Older versions of the library had support for SQLObject but SQLObject support
+has not been actively maintained since v0.3.
+
+The library is pretty stable and has been used by the authors in production
+systems since v0.2 (May 2008).
 
 
 Copyright and License
@@ -170,7 +173,11 @@ both of the related objects are versioned.
 
 6. (SA) Consistent object traversal both at HEAD and "in the past"
 
-7. Concurrency checking:
+7. (SA) Diffing support on versioning objects and listing of changes for a
+given Revision.
+
+8. Concurrency checking:
+
   1. Simultaneous edits of different parts of the domain model
   2. Simultaneous edits of same parts of domain model (conflict resolution or
      locking)
@@ -187,7 +194,8 @@ both of the related objects are versioned.
 
      Rather than summarize all situations just see Fowler on concurrency
 
-8. Support for pending updates (so updates must be approved before being visible)
+9. Support for pending updates (so updates must be approved before being visible)
+
   1. A non-approved user makes a change
   2. This change is marked as pending
   3. This change is notified to a moderator

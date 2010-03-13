@@ -8,14 +8,8 @@ from sqlalchemy.orm import object_session, class_mapper
 import vdm.sqlalchemy
 from demo import *
 
-from tools import Repository
-repo = Repository(metadata, Session,
-        versioned_objects = [ Package, License,  PackageTag ]
-        )
 
-
-class Test0SQLAlchemySession:
- 
+class Test_01_SQLAlchemySession:
     def test_1(self):
         assert not hasattr(Session, 'revision')
         assert vdm.sqlalchemy.SQLAlchemySession.at_HEAD(Session)
@@ -32,8 +26,7 @@ class Test0SQLAlchemySession:
         Session.remove()
 
 
-class TestVersioning:
-
+class Test_02_Versioning:
     @classmethod
     def setup_class(self):
         repo.rebuild_db()
@@ -50,6 +43,7 @@ class TestVersioning:
         self.notes1 = u'Here\nare some\nnotes'
         self.notes2 = u'Here\nare no\nnotes'
         lic1 = License(name='blah', open=True)
+        lic1.revision = rev1
         lic2 = License(name='foo', open=True)
         p1 = Package(name=self.name1, title=self.title1, license=lic1, notes=self.notes1)
         p2 = Package(name=self.name2, title=self.title1, license=lic1)
@@ -64,13 +58,12 @@ class TestVersioning:
 
         logger.debug('===== STARTING REV 2')
         session = Session()
-        session.begin()
         rev2 = Revision()
         vdm.sqlalchemy.SQLAlchemySession.set_revision(session, rev2)
         outlic1 = Session.query(License).filter_by(name='blah').first()
         outlic2 = Session.query(License).filter_by(name='foo').first()
         outlic2.open = False
-        session.add_all([rev2,outlic1,outlic2])
+        session.add_all([rev2])
         outp1 = Session.query(Package).filter_by(name=self.name1).one()
         outp2 = Session.query(Package).filter_by(name=self.name2).one()
         outp1.title = self.title2
@@ -85,7 +78,7 @@ class TestVersioning:
         # must do this after flush as timestamp not set until then
         self.ts2 = rev2.timestamp
         self.rev2_id = rev2.id
-        Session.clear()
+        Session.remove()
 
     @classmethod
     def teardown_class(self):
@@ -104,7 +97,7 @@ class TestVersioning:
     def test_basic(self):
         assert Session.query(License).count() == 2, Session.query(License).count()
         assert Session.query(Package).count() == 2, Session.query(Package).count()
-        assert 'revision_id' in LicenseRevision.c
+        assert hasattr(LicenseRevision, 'revision_id')
         assert Session.query(LicenseRevision).count() == 3, Session.query(LicenseRevision).count()
         assert Session.query(PackageRevision).count() == 4, Session.query(PackageRevision).count()
 
@@ -202,7 +195,7 @@ class TestVersioning:
         assert diff2 == diff, (diff2, diff)
 
 
-class TestStatefulVersioned:
+class Test_03_StatefulVersioned:
     @classmethod
     def setup_class(self):
         repo.rebuild_db()
@@ -299,7 +292,7 @@ class TestStatefulVersioned:
         assert len(p2rev.tags) == 0
 
 
-class TestStatefulVersioned2:
+class Test_04_StatefulVersioned2:
     '''Similar to previous but setting m2m list using existing objects'''
 
     def setup(self):
@@ -398,7 +391,7 @@ class TestStatefulVersioned2:
         self._test_tags()
 
 
-class TestRevertAndPurge:
+class Test_05_RevertAndPurge:
 
     @classmethod
     def setup_class(self):

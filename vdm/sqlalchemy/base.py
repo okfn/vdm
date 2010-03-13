@@ -184,7 +184,7 @@ class RevisionedObjectMixin(object):
 
     @property
     def revisioned_fields(self):
-        table = sqlalchemy.orm.class_mapper(self).mapped_table
+        table = sqlalchemy.orm.object_mapper(self).mapped_table
         fields = [ col.name for col in table.c if col.name not in
                 self.__ignored_fields__ ]
         return fields
@@ -461,27 +461,26 @@ class Revisioner(MapperExtension):
         # set revision to ensure object behaves how it should (e.g. we use
         # instance.revision in after_update)
         assert current_rev, 'No revision is currently set for this Session'
-        # We need the id unfortunately for this all to work
+        # We need the revision id unfortunately for this all to work
         # Why? We cannot created new sqlachemy objects in here (as they won't
         # get saved). This means we have to created revision_object directly in
         # database which requires we use *column* values. In particular, we
         # need revision_id not revision object to create revision_object
         # properly!
+        logger.debug('Revisioner.set_revision: revision is %s' % current_rev)
         assert current_rev.id, 'Must have a revision.id to create object revision'
-        # if not current_rev.id: # not yet flushed ...
-            # Now that we are using uuids, this is ok! Otherwise we would have
-            # *serious* problems ...
-            # current_rev.id = make_uuid()
-        instance.revision_id = current_rev.id
         instance.revision = current_rev
+        # must set both since we are already in flush so setting object will
+        # not be enough
+        instance.revision_id = current_rev.id
 
-    def check_real_change(self, instance, mapper):
+    def check_real_change(self, instance, mapper, connection):
         logger.debug('check_real_change: %s' % instance)
         table = mapper.tables[0]
         colname = 'id'
         ctycol = table.c[colname]
         ctyval = getattr(instance, colname)
-        values = table.select(ctycol==ctyval).execute().fetchone() 
+        values = connection.execute(table.select(ctycol==ctyval)).fetchone() 
         if values is None: # object not yet created
             logger.debug('check_real_change: True (object not yet created)')
             return True
@@ -500,7 +499,7 @@ class Revisioner(MapperExtension):
         logger.debug('check_real_change: False')
         return False
 
-    def make_revision(self, instance, mapper):
+    def make_revision(self, instance, mapper, connection):
         # NO GOOD working with the object as that only gets committed at next
         # flush. Need to work with the table directly
         colvalues = {}
@@ -522,15 +521,16 @@ class Revisioner(MapperExtension):
         revision_already_query = revision_already_query.where(
                 existing_revision_clause
                 )
-        num_revisions = revision_already_query.execute().scalar()
+        num_revisions = connection.execute(revision_already_query).scalar()
         revision_already = num_revisions > 0
 
         if revision_already:
             logger.debug('Updating version of %s: %s' % (instance, colvalues))
-            self.revision_table.update(existing_revision_clause).execute(colvalues)
+            connection.execute(self.revision_table.update(existing_revision_clause).values(colvalues))
         else:
             logger.debug('Creating version of %s: %s' % (instance, colvalues))
-            self.revision_table.insert().execute(colvalues)
+            ins = self.revision_table.insert().values(colvalues)
+            connection.execute(ins)
 
         # set to None to avoid accidental reuse
         # ERROR: cannot do this as after_* is called per object and may be run
@@ -539,17 +539,19 @@ class Revisioner(MapperExtension):
         # object_session(instance).revision = None
 
     def before_update(self, mapper, connection, instance):
-        self._is_changed = self.check_real_change(instance, mapper)
+        self._is_changed = self.check_real_change(instance, mapper, connection)
         if not self.revisioning_disabled(instance) and self._is_changed:
             logger.debug('before_update: %s' % instance)
             self.set_revision(instance)
-            self._is_changed = self.check_real_change(instance, mapper)
+            self._is_changed = self.check_real_change(instance, mapper,
+                    connection)
         return EXT_CONTINUE
 
-    # TODO: explain why we cannot do everything here
-    # i.e. why do we need to run stuff in after_update
+    # We do most of the work in after_insert/after_update as at that point
+    # instance has been properly created (which means e.g. instance.id is
+    # available ...)
     def before_insert(self, mapper, connection, instance):
-        self._is_changed = self.check_real_change(instance, mapper)
+        self._is_changed = self.check_real_change(instance, mapper, connection)
         if not self.revisioning_disabled(instance) and self._is_changed:
             logger.debug('before_insert: %s' % instance)
             self.set_revision(instance)
@@ -558,13 +560,13 @@ class Revisioner(MapperExtension):
     def after_update(self, mapper, connection, instance):
         if not self.revisioning_disabled(instance) and self._is_changed:
             logger.debug('after_update: %s' % instance)
-            self.make_revision(instance, mapper)
+            self.make_revision(instance, mapper, connection)
         return EXT_CONTINUE
 
     def after_insert(self, mapper, connection, instance):
         if not self.revisioning_disabled(instance) and self._is_changed:
             logger.debug('after_insert: %s' % instance)
-            self.make_revision(instance, mapper)
+            self.make_revision(instance, mapper, connection)
         return EXT_CONTINUE
 
     def append_result(self, mapper, selectcontext, row, instance, result,
