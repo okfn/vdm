@@ -263,11 +263,16 @@ class RevisionedObjectMixin(object):
         if not from_revision:
             from_revision = sess.query(Revision).\
                 filter(Revision.timestamp<to_revision.timestamp).first()
-        out = sess.query(revision_class).join('revision').\
-            filter(Revision.timestamp<=from_revision.timestamp).\
-            filter(revision_class.id==self.id).\
-            order_by(Revision.timestamp.desc())
-        from_obj_rev = out.first()
+        # from_revision may be None, e.g. if to_revision is rev when object was
+        # created
+        if from_revision:
+            out = sess.query(revision_class).join('revision').\
+                filter(Revision.timestamp<=from_revision.timestamp).\
+                filter(revision_class.id==self.id).\
+                order_by(Revision.timestamp.desc())
+            from_obj_rev = out.first()
+        else:
+            from_obj_rev = None
         return self._diff_revision_objects(to_obj_rev, from_obj_rev)
 
     def _diff_revision_objects(self, to_obj_rev, from_obj_rev):
@@ -275,10 +280,11 @@ class RevisionedObjectMixin(object):
         fields = self.revisioned_fields
 
         for field in fields:
-             values = [getattr(rev, field) for rev in [from_obj_rev, to_obj_rev]]
-             diff = self._differ(values[0], values[1])
-             if diff:
-                  diffs[field] = diff
+            # allow None on getattr since rev may be None (see above)
+            values = [getattr(rev, field, None) for rev in [from_obj_rev, to_obj_rev]]
+            diff = self._differ(values[0], values[1])
+            if diff:
+                diffs[field] = diff
         return diffs
 
     def _differ(self, str_a, str_b):

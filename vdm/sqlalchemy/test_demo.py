@@ -194,6 +194,14 @@ class Test_02_Versioning:
         diff2 = p1.diff()
         assert diff2 == diff, (diff2, diff)
 
+    def test_diff_2(self):
+        '''Test diffing at a revision where just created.'''
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
+        pr2, pr1 = p1.all_revisions
+
+        diff1 = p1.diff(to_revision=pr1.revision)
+        assert diff1['title'] == u'- None\n+ XYZ', diff1
+
 
 class Test_03_StatefulVersioned:
     @classmethod
