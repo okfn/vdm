@@ -267,7 +267,7 @@ class StatefulList(StatefulProxy):
                 for ii in rng:
                     start = rng[0]
                     del self[start]
-                ii = index.start
+                ii = index.start or 0
                 for item in value:
                     self.insert(ii, item)
                     ii += 1
@@ -433,8 +433,12 @@ class DeferredProperty(object):
             return stateful_list
 
     def __set__(self, obj, values):
-        raise NotImplementedError()
-
+        # Must not replace the StatefulList object with a list,
+        # so instead replace the values in the Stateful list with
+        # the list values passed on. The existing values are accessed
+        # using [:] invoking __setitem__.
+        self.__get__(obj, None)[:] = values
+        
 
 from sqlalchemy import __version__ as sqla_version
 import sqlalchemy.ext.associationproxy
