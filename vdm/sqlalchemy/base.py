@@ -437,6 +437,10 @@ class Revisioner(MapperExtension):
 
     def __init__(self, revision_table):
         self.revision_table = revision_table
+        # Sometimes (not predictably) the after_update method is called
+        # *after* the next instance's before_update! So to avoid this,
+        # we store the instance with the is_changed flag.
+        self._is_changed = {} # instance:is_changed
 
     def revisioning_disabled(self, instance):
         # logger.debug('revisioning_disabled: %s' % instance)
@@ -545,32 +549,32 @@ class Revisioner(MapperExtension):
         # object_session(instance).revision = None
 
     def before_update(self, mapper, connection, instance):
-        self._is_changed = self.check_real_change(instance, mapper, connection)
-        if not self.revisioning_disabled(instance) and self._is_changed:
+        self._is_changed[instance] = self.check_real_change(instance, mapper, connection)
+        if not self.revisioning_disabled(instance) and self._is_changed[instance]:
             logger.debug('before_update: %s' % instance)
             self.set_revision(instance)
-            self._is_changed = self.check_real_change(instance, mapper,
-                    connection)
+            self._is_changed[instance] = self.check_real_change(
+                instance, mapper, connection)
         return EXT_CONTINUE
 
     # We do most of the work in after_insert/after_update as at that point
     # instance has been properly created (which means e.g. instance.id is
     # available ...)
     def before_insert(self, mapper, connection, instance):
-        self._is_changed = self.check_real_change(instance, mapper, connection)
-        if not self.revisioning_disabled(instance) and self._is_changed:
+        self._is_changed[instance] = self.check_real_change(instance, mapper, connection)
+        if not self.revisioning_disabled(instance) and self._is_changed[instance]:
             logger.debug('before_insert: %s' % instance)
             self.set_revision(instance)
         return EXT_CONTINUE
 
     def after_update(self, mapper, connection, instance):
-        if not self.revisioning_disabled(instance) and self._is_changed:
+        if not self.revisioning_disabled(instance) and self._is_changed[instance]:
             logger.debug('after_update: %s' % instance)
             self.make_revision(instance, mapper, connection)
         return EXT_CONTINUE
 
     def after_insert(self, mapper, connection, instance):
-        if not self.revisioning_disabled(instance) and self._is_changed:
+        if not self.revisioning_disabled(instance) and self._is_changed[instance]:
             logger.debug('after_insert: %s' % instance)
             self.make_revision(instance, mapper, connection)
         return EXT_CONTINUE
