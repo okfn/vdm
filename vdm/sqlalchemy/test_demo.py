@@ -183,7 +183,7 @@ class Test_02_Versioning:
         pr2, pr1 = p1.all_revisions
         # pr1, pr2 = prs[::-1]
         
-        diff = p1._diff_revision_objects(pr2, pr1)
+        diff = p1.diff_revisioned_fields(pr2, pr1, Package)
         assert diff['title'] == '- XYZ\n+ ABC', diff['title']
         assert diff['notes'] == '  Here\n- are some\n+ are no\n  notes', diff['notes']
         assert diff['license_id'] == '- 1\n+ 2', diff['license_id']

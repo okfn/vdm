@@ -281,6 +281,7 @@ class RevisionedObjectMixin(object):
         commits (NB: no changes may have occurred to *this* object in those
         commits).
         '''
+        sess = object_session(self)
         if to_revision is None:
             to_revision = Revision.youngest(sess)
         out = obj_revision_query.\
