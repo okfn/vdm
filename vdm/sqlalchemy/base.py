@@ -182,11 +182,11 @@ class RevisionedObjectMixin(object):
     __ignored_fields__ = ['revision_id']
     __revisioned__ = True
 
-    @property
-    def revisioned_fields(self):
-        table = sqlalchemy.orm.object_mapper(self).mapped_table
+    @classmethod
+    def revisioned_fields(cls):
+        table = sqlalchemy.orm.class_mapper(cls).mapped_table
         fields = [ col.name for col in table.c if col.name not in
-                self.__ignored_fields__ ]
+                cls.__ignored_fields__ ]
         return fields
 
     def get_as_of(self, revision=None):
@@ -251,14 +251,40 @@ class RevisionedObjectMixin(object):
         commits (NB: no changes may have occurred to *this* object in those
         commits).
         '''
+        obj_rev_class = self.__revision_class__
         sess = object_session(self)
-        revision_class = self.__revision_class__
+        obj_rev_query = sess.query(obj_rev_class).join('revision').\
+                        filter(obj_rev_class.id==self.id).\
+                        order_by(Revision.timestamp.desc())
+        obj_class = self
+        to_obj_rev, from_obj_rev = self.get_obj_revisions_to_diff(\
+            obj_rev_query,
+            to_revision=to_revision,
+            from_revision=from_revision)
+        return self.diff_revisioned_fields(to_obj_rev, from_obj_rev,
+                                           obj_class)
+
+    
+    def get_obj_revisions_to_diff(self, obj_revision_query, to_revision=None,
+                           from_revision=None):
+        '''Diff this object returning changes between `from_revision` and
+        `to_revision`.
+
+        @param obj_revision_query: query of all object revisions related to
+        the object being diffed. e.g. all PackageRevision objects with 
+        @param to_revision: revision to diff to (defaults to the youngest rev)
+        @param from_revision: revision to diff from (defaults to one revision
+        older than to_revision)
+        @return: dict of diffs keyed by field name
+
+        e.g. diff(HEAD, HEAD-2) will show diff of changes made in last 2
+        commits (NB: no changes may have occurred to *this* object in those
+        commits).
+        '''
         if to_revision is None:
             to_revision = Revision.youngest(sess)
-        out = sess.query(revision_class).join('revision').\
-            filter(Revision.timestamp<=to_revision.timestamp).\
-            filter(revision_class.id==self.id).\
-            order_by(Revision.timestamp.desc())
+        out = obj_revision_query.\
+              filter(Revision.timestamp<=to_revision.timestamp)
         to_obj_rev = out.first()
         if not from_revision:
             from_revision = sess.query(Revision).\
@@ -266,27 +292,35 @@ class RevisionedObjectMixin(object):
         # from_revision may be None, e.g. if to_revision is rev when object was
         # created
         if from_revision:
-            out = sess.query(revision_class).join('revision').\
-                filter(Revision.timestamp<=from_revision.timestamp).\
-                filter(revision_class.id==self.id).\
-                order_by(Revision.timestamp.desc())
+            out = obj_revision_query.\
+                filter(Revision.timestamp<=from_revision.timestamp)
             from_obj_rev = out.first()
         else:
             from_obj_rev = None
-        return self._diff_revision_objects(to_obj_rev, from_obj_rev)
-
-    def _diff_revision_objects(self, to_obj_rev, from_obj_rev):
+        return to_obj_rev, from_obj_rev
+    
+    @classmethod
+    def diff_revisioned_fields(self, to_obj_rev, from_obj_rev, obj_class):
+        '''
+        Given two object revisions (e.g. PackageRevisions), diffs the
+        revisioned fields.
+        @to_obj_rev final object revision to diff
+        @from_obj_rev original object revision to diff
+        @param obj_class: class of object
+        @return dict of the diffs, keyed by the field names
+        '''
         diffs = {}
-        fields = self.revisioned_fields
+        fields = obj_class.revisioned_fields()
 
         for field in fields:
             # allow None on getattr since rev may be None (see above)
-            values = [getattr(rev, field, None) for rev in [from_obj_rev, to_obj_rev]]
+            values = [getattr(obj_rev, field, None) for obj_rev in [from_obj_rev, to_obj_rev]]
             diff = self._differ(values[0], values[1])
             if diff:
                 diffs[field] = diff
         return diffs
 
+    @classmethod
     def _differ(self, str_a, str_b):
         str_a = unicode(str_a)
         str_b = unicode(str_b)
@@ -501,7 +535,7 @@ class Revisioner(MapperExtension):
         # for a save/update operation. We check here against the last version
         # to ensure we really should save this version and update the version
         # data.
-        for key in instance.revisioned_fields:
+        for key in instance.revisioned_fields():
             if getattr(instance, key) != values[key]:
                 # the instance was really updated, so we create a new version
                 logger.debug('check_real_change: True')
