@@ -1,11 +1,11 @@
 HEAD
 ====
 
-v0.7 2010-??-??
+v0.7 2010-05-11
 ===============
 
   * Support for SQLALchemy v0.5
-  * Improved diff support
+  * Reorganised diff interface to allow diffing of related domain objects
 
 v0.6 2010-01-25
 ===============
