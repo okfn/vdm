@@ -96,10 +96,6 @@ class Revision(SQLAlchemyMixin):
         q = session.query(self)
         return q.first()
 
-    @property
-    def timestamp_pretty(self):
-        return self.timestamp.strftime('%Y-%m-%d %H:%m')
-
 
 def make_Revision(mapper, revision_table):
     mapper(Revision, revision_table, properties={
