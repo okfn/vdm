@@ -20,17 +20,16 @@ systems since v0.2 (May 2008).
 Copyright and License
 =====================
 
-(c) 2007-2010 The Open Knowledge Foundation
+Copyright (c) 2007-2010 The Open Knowledge Foundation
 
-Licensed under the MIT license:
-
-  <http://www.opensource.org/licenses/mit-license.php>
+Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
 
 
 Authors
 =======
 
-Rufus Pollock - http://rufuspollock.org/
+Rufus Pollock (Open Knowledge Foundation) - http://rufuspollock.org/
+http://www.okfn.org/
 
 
 A Full Versioned Domain Model
@@ -107,16 +106,17 @@ To give a flavour of all of this here is a pseudo-code example::
 Code in Action
 --------------
 
-To see some real code in action take a look at::
+To see some real code in action take a look at, for SQLAlchemy::
 
     vdm/sqlalchemy/demo.py
     vdm/sqlalchemy/demo_test.py
 
-WARNING: the SQLObject code is no longer actively maintained.
+For SQLObject::
 
     vdm/sqlobject/demo.py
     vdm/sqlobject/demo_test.py
 
+.. warning:: the SQLObject code is no longer actively maintained.
 
 General Conceptual Documentation
 ================================

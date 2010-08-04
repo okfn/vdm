@@ -3,10 +3,6 @@
 For general information about versioned domain models see the root vdm package
 docstring.
 
-Annotated illustration of simple usage in simple_demo.py and more complex usage
-in demo.py and demo_test.py.
-
-
 Implementation Notes
 ====================
 

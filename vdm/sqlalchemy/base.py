@@ -462,12 +462,17 @@ from sqlalchemy.orm import object_session
 from sqlalchemy.orm import EXT_CONTINUE
 
 class Revisioner(MapperExtension):
-    '''Revision revisioned objects.
+    '''SQLAlchemy MapperExtension which implements revisioning of sqlalchemy
+    mapped objects.
     
-    In essence we are implementing copy on write.
+    In essence it implements copy on write.
 
-    However: we need to be a bit careful to ignore non-versioned attributes
-    etc.
+    However various additional features such as:
+    
+        * Checking for 'real' changes -- often sqlalchemy objects are marked as
+          changed when not (just a related attribute has changed).
+        * support for ignored attributes (these attributes will be ignored when
+          checking for changes and creating new revisions of the object)
     '''
 
     def __init__(self, revision_table):
