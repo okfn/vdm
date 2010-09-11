@@ -21,13 +21,12 @@ if sqav[:3] in ("0.4", "0.5"):
                self.execute()
      postgres.dialect.schemadropper = CascadeSchemaDropper
 elif sqav.startswith("0.6"):
-     from sqlalchemy.dialects.postgresql import base as pgbase
-     class PGCompiler(pgbase.PGCompiler):
-          def visit_drop_table(self, drop):
-               return "\nDROP TABLE " + \
-                      self.preparer.format_table(drop.element) + \
-                      " CASCADE"
-     pgbase.PGCompiler = PGCompiler
+     from sqlalchemy.dialects.postgresql import base
+     def visit_drop_table(self, drop):
+          return "\nDROP TABLE " + \
+                 self.preparer.format_table(drop.element) + \
+                 " CASCADE"
+     base.dialect.ddl_compiler.visit_drop_table = visit_drop_table
 else:
      raise ValueError("VDM only works with SQLAlchemy versions 0.4 through 0.6")
 

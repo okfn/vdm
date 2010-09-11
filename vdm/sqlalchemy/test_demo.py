@@ -15,6 +15,13 @@ else:
     _clear = Session.expunge_all
     
 class Test_01_SQLAlchemySession:
+    @classmethod
+    def setup_class(self):
+        repo.rebuild_db()
+    @classmethod
+    def teardown_class(self):
+        Session.remove()
+
     def test_1(self):
         assert not hasattr(Session, 'revision')
         assert vdm.sqlalchemy.SQLAlchemySession.at_HEAD(Session)
@@ -38,7 +45,8 @@ class Test_02_Versioning:
 
         logger.debug('===== STARTING REV 1')
         session = Session()
-        rev1 = Revision() 
+        rev1 = Revision()
+        session.add(rev1)
         vdm.sqlalchemy.SQLAlchemySession.set_revision(session, rev1)
 
         self.name1 = 'anna'
@@ -52,7 +60,7 @@ class Test_02_Versioning:
         lic2 = License(name='foo', open=True)
         p1 = Package(name=self.name1, title=self.title1, license=lic1, notes=self.notes1)
         p2 = Package(name=self.name2, title=self.title1, license=lic1)
-        session.add_all([rev1,lic1,lic2,p1,p2])
+        session.add_all([lic1,lic2,p1,p2])
 
         logger.debug('***** Committing/Flushing Rev 1')
         session.commit()
@@ -64,11 +72,11 @@ class Test_02_Versioning:
         logger.debug('===== STARTING REV 2')
         session = Session()
         rev2 = Revision()
+        session.add(rev2)
         vdm.sqlalchemy.SQLAlchemySession.set_revision(session, rev2)
         outlic1 = Session.query(License).filter_by(name='blah').first()
         outlic2 = Session.query(License).filter_by(name='foo').first()
         outlic2.open = False
-        session.add_all([rev2])
         outp1 = Session.query(Package).filter_by(name=self.name1).one()
         outp2 = Session.query(Package).filter_by(name=self.name2).one()
         outp1.title = self.title2
@@ -222,7 +230,7 @@ class Test_03_StatefulVersioned:
         t2 = Tag(name='geo2')
         p1.tags.append(t1)
         p1.tags.append(t2)
-        Session.add_all([rev1,p1,t1,t2])
+        Session.add_all([p1,t1,t2])
         Session.commit()
         self.rev1_id = rev1.id
         Session.remove()
@@ -411,13 +419,14 @@ class Test_05_RevertAndPurge:
         Session.remove()
         repo.rebuild_db()
 
-        rev1 = Revision() 
+        rev1 = Revision()
+        Session.add(rev1)
         vdm.sqlalchemy.SQLAlchemySession.set_revision(Session, rev1)
         
         self.name1 = 'anna'
         p1 = Package(name=self.name1)
         p2 = Package(name='blahblah')
-        Session.add_all([rev1,p1,p2])
+        Session.add_all([p1,p2])
         repo.commit_and_remove()
 
         self.name2 = 'warandpeace'
@@ -426,7 +435,7 @@ class Test_05_RevertAndPurge:
         p1 = Session.query(Package).filter_by(name=self.name1).one()
         p1.name = self.name2
         l1 = License(name=self.lname)
-        Session.add_all([rev2,p1,l1])
+        Session.add_all([p1,l1])
         repo.commit()
         self.rev2id = rev2.id
         Session.remove()

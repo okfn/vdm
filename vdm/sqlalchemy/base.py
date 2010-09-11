@@ -39,6 +39,10 @@ class SQLAlchemySession(object):
     def set_revision(self, session, revision):
         self.setattr(session, 'HEAD', True)
         self.setattr(session, 'revision', revision)
+        if revision.id is None:
+            session.begin_nested()
+            session.add(revision)
+            session.commit()
 
     @classmethod
     def get_revision(self, session):
@@ -86,7 +90,11 @@ class Revision(SQLAlchemyMixin):
     '''
     # TODO:? set timestamp in ctor ... (maybe not as good to have undefined
     # until actual save ...)
-
+    @property
+    def __id__(self):
+        if self.id is None:
+            self.id = make_uuid()
+        return self.id
     @classmethod
     def youngest(self, session):
         '''Get the youngest (most recent) revision.
