@@ -35,6 +35,12 @@ mapper = SessionObject.mapper
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm.collections import attribute_mapped_collection
 
+from sqlalchemy import __version__ as sqav
+if sqav.startswith("0.4"):
+    _clear = session.clear
+else:
+    _clear = session.expunge_all
+    
 class BaseObject(object):
 
     def __repr__(self):
@@ -117,7 +123,7 @@ class TestStatefulCollections(object):
             pkg1.licenses_active.append(PackageLicense(pkg1, li))
         del pkg1.licenses_active[3]
         session.flush()
-        session.clear()
+        _clear()
 
     def test_0_package_licenses(self):
         pkg1 = Package.query.get('pkg1')
@@ -136,12 +142,12 @@ class TestStatefulCollections(object):
         assert len(p1.licenses_active) == 3
         assert len(p1.licenses_deleted) == 2
         session.flush()
-        session.clear()
+        _clear()
         p1 = Package.query.get('pkg1')
         assert len(p1.package_licenses) == 5
         assert len(p1.licenses_active) == 3
         assert len(p1.licenses_deleted) == 2
-        session.clear()
+        _clear()
 
     def test_3_assign_etc(self):
         p1 = Package.query.get('pkg1')
@@ -150,7 +156,7 @@ class TestStatefulCollections(object):
         assert len(p1.licenses_active) == 0
         assert len(p1.licenses_deleted) == 5
         session.flush()
-        session.clear()
+        _clear()
 
         p1 = Package.query.get('pkg1')
         assert len(p1.licenses) == 0 
@@ -173,7 +179,7 @@ class TestStatefulVersionedCollections(object):
             pkg2.licenses3_active.append(PackageLicense(pkg2, li))
         del pkg2.licenses3_active[3]
         session.flush()
-        session.clear()
+        _clear()
 
     def test_0_package_licenses(self):
         pkg2 = Package.query.get('pkg2')
@@ -192,12 +198,12 @@ class TestStatefulVersionedCollections(object):
         assert len(p1.licenses3_active) == 3
         assert len(p1.licenses3_deleted) == 2
         session.flush()
-        session.clear()
+        _clear()
         p1 = Package.query.get('pkg2')
         assert len(p1.package_licenses) == 5
         assert len(p1.licenses3_active) == 3
         assert len(p1.licenses3_deleted) == 2
-        session.clear()
+        _clear()
 
     def test_3_assign_etc(self):
         p1 = Package.query.get('pkg2')
@@ -206,7 +212,7 @@ class TestStatefulVersionedCollections(object):
         assert len(p1.licenses3_active) == 0
         assert len(p1.licenses3_deleted) == 5
         session.flush()
-        session.clear()
+        _clear()
 
         p1 = Package.query.get('pkg2')
         assert len(p1.licenses3) == 0 
@@ -228,7 +234,7 @@ class TestSimple:
         pkg1.package_licenses[-1].state = 'deleted'
         session.flush()
         # must clear or other things won't behave
-        session.clear()
+        _clear()
 
     def test_2(self):
         p1 = Package.query.get('pkg3')

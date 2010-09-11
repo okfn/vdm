@@ -8,7 +8,12 @@ from sqlalchemy.orm import object_session, class_mapper
 import vdm.sqlalchemy
 from demo import *
 
-
+from sqlalchemy import __version__ as sqav
+if sqav.startswith("0.4"):
+    _clear = Session.clear
+else:
+    _clear = Session.expunge_all
+    
 class Test_01_SQLAlchemySession:
     def test_1(self):
         assert not hasattr(Session, 'revision')
@@ -53,7 +58,7 @@ class Test_02_Versioning:
         session.commit()
         # can only get it after the flush
         self.rev1_id = rev1.id
-        Session.clear()
+        _clear()
         Session.remove()
 
         logger.debug('===== STARTING REV 2')
@@ -314,7 +319,7 @@ class Test_04_StatefulVersioned2:
         p1 = Package(name=self.name1)
         t1 = Tag(name='geo')
         p1.tags.append(t1)
-        Session.add_all([rev1,p1,t1])
+        Session.add_all([p1,t1])
         Session.commit()
         self.rev1_id = rev1.id
         Session.remove()

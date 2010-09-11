@@ -14,7 +14,7 @@ from sqlalchemy import __version__ as sqla_version
 import vdm.sqlalchemy
 
 # engine = create_engine('sqlite:///:memory:')
-engine = create_engine('postgres://tester:pass@localhost/vdmtest')
+engine = create_engine('postgres://tester:pass@localhost/vdmtest', pool_threadlocal=True)
 metadata = MetaData(bind=engine)
 
 ## VDM-specific tables
@@ -115,7 +115,9 @@ from sqlalchemy.orm import relation, backref
 if sqla_version <= '0.4.99':
     Session = scoped_session(sessionmaker(autoflush=True, transactional=True))
 else:
-    Session = scoped_session(sessionmaker(autoflush=True, autocommit=False))
+    Session = scoped_session(sessionmaker(autoflush=True,
+                                          expire_on_commit=False,
+                                          autocommit=False))
 
 # mapper = Session.mapper
 from sqlalchemy.orm import mapper

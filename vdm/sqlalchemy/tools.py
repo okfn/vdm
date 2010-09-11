@@ -5,21 +5,32 @@ Primarily organized within a `Repository` object.
 import logging
 logger = logging.getLogger('vdm')
 
-
 # fix up table dropping on postgres
 # http://blog.pythonisito.com/2008/01/cascading-drop-table-with-sqlalchemy.html
-from sqlalchemy.databases import postgres
-class PGCascadeSchemaDropper(postgres.PGSchemaDropper):
-     def visit_table(self, table):
-        for column in table.columns:
-            if column.default is not None:
-                self.traverse_single(column.default)
-        self.append("\nDROP TABLE " +
-                    self.preparer.format_table(table) +
-                    " CASCADE")
-        self.execute()
+from sqlalchemy import __version__ as sqav
+if sqav[:3] in ("0.4", "0.5"):
+     from sqlalchemy.databases import postgres
+     class CascadeSchemaDropper(postgres.PGSchemaDropper):
+          def visit_table(self, table):
+               for column in table.columns:
+                    if column.default is not None:
+                         self.traverse_single(column.default)
+               self.append("\nDROP TABLE " +
+                           self.preparer.format_table(table) +
+                           " CASCADE")
+               self.execute()
+     postgres.dialect.schemadropper = CascadeSchemaDropper
+elif sqav.startswith("0.6"):
+     from sqlalchemy.dialects.postgresql import base as pgbase
+     class PGCompiler(pgbase.PGCompiler):
+          def visit_drop_table(self, drop):
+               return "\nDROP TABLE " + \
+                      self.preparer.format_table(drop.element) + \
+                      " CASCADE"
+     pgbase.PGCompiler = PGCompiler
+else:
+     raise ValueError("VDM only works with SQLAlchemy versions 0.4 through 0.6")
 
-postgres.dialect.schemadropper = PGCascadeSchemaDropper
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import ScopedSession
@@ -28,7 +39,6 @@ from sqlalchemy.orm import object_session
 from sqlalchemy import __version__ as sqla_version
 
 from base import SQLAlchemySession, State, Revision
-
 
 class Repository(object):
     '''Manage repository-wide type changes for versioned domain models.
@@ -60,7 +70,7 @@ class Repository(object):
         else:    
             self.transactional = tmpsess.transactional
         if self.dburi:
-            engine = create_engine(dburi)
+            engine = create_engine(dburi, pool_threadlocal=True)
             self.metadata.bind = engine 
             self.session.bind = engine
 
@@ -109,7 +119,7 @@ class Repository(object):
         as transactional (every commit is paired with a begin)
         <http://groups.google.com/group/sqlalchemy/browse_thread/thread/a54ce150b33517db/17587ca675ab3674>
         '''
-        rev = Revision()                                      
+        rev = Revision()
         self.session.add(rev)
         SQLAlchemySession.set_revision(self.session, rev)             
         return rev
