@@ -156,7 +156,7 @@ def make_revisioned_table(base_table):
     for col in newtable.c:
         if col.name == 'revision_id':
             col.primary_key = True
-            newtable.primary_key.add(col)
+            newtable.primary_key.columns.add(col)
     return newtable
 
 
