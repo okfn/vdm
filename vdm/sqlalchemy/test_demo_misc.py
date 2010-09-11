@@ -71,8 +71,8 @@ class TestMisc:
         assert len(outcol.foreign_keys) == 1
         infk = incol.foreign_keys[0]
         outfk = outcol.foreign_keys[0]
-        assert infk.parent
-        assert outfk.parent
+        assert infk.parent is not None
+        assert outfk.parent is not None
 
     def test_table_copy(self):
         t1 = package_table
@@ -91,8 +91,8 @@ class TestMisc:
         assert len(outcol.foreign_keys) == 1
         infk = incol.foreign_keys[0]
         outfk = outcol.foreign_keys[0]
-        assert infk.parent
-        assert outfk.parent
+        assert infk.parent is not None
+        assert outfk.parent is not None
 
     def test_package_tag_table(self):
         col = package_tag_table.c['tag_id']
