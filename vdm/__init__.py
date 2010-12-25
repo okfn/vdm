@@ -8,10 +8,7 @@ versions a complete model and not just individual domain objects (for more on
 this distinction see below).
 
 At present the package is provided as an extension to SQLAlchemy (tested
-against v0.4 and v0.5).
-
-Older versions of the library had support for SQLObject but SQLObject support
-has not been actively maintained since v0.3.
+against v0.4-v0.6).
 
 The library is pretty stable and has been used by the authors in production
 systems since v0.2 (May 2008).
@@ -111,12 +108,6 @@ To see some real code in action take a look at, for SQLAlchemy::
     vdm/sqlalchemy/demo.py
     vdm/sqlalchemy/demo_test.py
 
-For SQLObject::
-
-    vdm/sqlobject/demo.py
-    vdm/sqlobject/demo_test.py
-
-.. warning:: the SQLObject code is no longer actively maintained.
 
 General Conceptual Documentation
 ================================
@@ -158,18 +149,17 @@ Use Cases
 ---------
 
 SA = Implemented in SQLAlchemy
-SO = Implemented in SQLObject (no longer actively maintained)
 
-1. (SA,SO) CRUD for a simple versioned object (no references other than HasA)
+1. (SA) CRUD for a simple versioned object (no references other than HasA)
 
-2. (SA,SO) Versioning of Many-2-Many and many-2-one relationships where one or
+2. (SA) Versioning of Many-2-Many and many-2-one relationships where one or
 both of the related objects are versioned.
 
-3. (SA,SO) Undelete for the above.
+3. (SA) Undelete for the above.
 
-4. (SA,SO) Purge for the above.
+4. (SA) Purge for the above.
 
-5. (SA, SO) Support for changing multiple objects in a single commit.
+5. (SA) Support for changing multiple objects in a single commit.
 
 6. (SA) Consistent object traversal both at HEAD and "in the past"
 
