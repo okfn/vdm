@@ -8,6 +8,7 @@ Contents:
     
    sqlalchemy
    theory
+   changeset
 
 .. automodule:: vdm
 
