@@ -3,7 +3,10 @@ Plan for a changeset model
 
 Changeset represents a simplication of existing vdm approach.
 
-It develops a changeset approach similar to that found in mercurial and git and as developed in prototype form in CKAN.
+It develops a changeset approach similar to that found in mercurial and git and
+as developed in prototype form in CKAN (see `these wiki pages`_)
+
+.. _these wiki pages: http://ckan.org/wiki/DistributingChanges
 
 It is agnostic about format of versioning (i.e. copy-on-Write versus diffs)
 
@@ -23,7 +26,8 @@ Key Concepts
 
 Optional (?) additional items:
 
-* 
+* Tags
+* Branches
 
 Remarks: Changesets form a directed acyclic graph.
 
@@ -31,12 +35,18 @@ Changeset
 =========
 
   * id
-  * parents
-  * closes
+  * parents = ordered list of ids
   * timestamp
   * author
-  * log_message
+  * message
   * meta - arbitrary key/value metadata
+
+ChangeManifest
+==============
+
+  * object_identifier
+  * change_type: delete | update | create | (move? copy?)
+  * representation_type: full | diff
 
 ChangeObject
 ============
@@ -46,11 +56,56 @@ ChangeObject
   * representation_type: full | diff
   * representation: serialization of this change either as full dump of object (copy-on-write) or diff
 
+Doing Things
+============
+
+Applying changes to a working copy
+----------------------------------
+
+Trivial.
+
+Reconstructing the repository at a given changeset/revision
+-----------------------------------------------------------
+
+Specifically we require to reconstruct a given object at that changeset. The
+process:
+
+  1. Get object ID
+  2. If using CoW (copy-on-write): find first changeset <= {given-changeset} in
+     which there is a ChangeObject entry containing the object ID and return
+     this. END.
+  3. If using diff: find all ChangeObjects with changesets <= {given-changeset}
+     and concatenate. Return resulting object.
+
+
+Merging
+-------
+
+
 Questions
 =========
 
-  * How do we cherry-pick? I.e. select certain changesets and not others (they depeond 
-  * How do we transplant? Ie. copy a set of changesets from one line of development to another?
+Practical
+---------
+
+  * How do we cherry-pick? I.e. select certain changesets and not others (they
+    depend 
+  * How do we transplant? Ie. copy a set of changesets from one line of
+    development to another?
+
+Technical
+
+  * How do we compute changeset ids (and changeobject ids)?
+  * Does the ordering of ChangeObjects in a ChangesetManifest matter? Current
+    answer: No.
+
+
+What's Different from Git?
+--------------------------
+
+We don't store a current state of the domain model on each commit (rather we
+store changes to the domain model and copies or diffs of domain objects).
+
 
 Reading
 =======
@@ -60,9 +115,28 @@ Mercurial
 
 Basic overview of the Mercurial model: http://mercurial.selenic.com/wiki/UnderstandingMercurial
 
-  * changeset
+Longer overview: http://mercurial.selenic.com/wiki/Mercurial?action=AttachFile&do=get&target=Hague2009.pdf
+
+Key concepts:
+
+  * changeset / changelog (our changeset)
   * manifest
   * file
+
+Details of `Mercurial hash generation`_:
+
+> Mercurial hashes both the contents of an object and the hash of its parents
+> to create an identifier that uniquely identifies an object's contents and
+> history.  This greatly simplifies merging of histories because it avoid graph
+> cycles that can occur when a object is reverted to an earlier state.
+
+> All file revisions have an associated hash value (the nodeid). These are
+> listed in the manifest of a given project revision, and the manifest hash is
+> listed in the changeset. The changeset hash (the changeset ID) is again a
+> hash of the changeset contents and its parents, so it uniquely identifies the
+> entire history of the project to that point.
+
+.. Mercurial hash generation: http://mercurial.selenic.com/wiki/FAQ#FAQ.2BAC8-TechnicalDetails.How_do_Mercurial_hashes_get_calculated.3F
 
 Git
 ---
@@ -84,4 +158,7 @@ Extras:
   * references (pointers into commit tree)
   * tags
 
+Git hash computation::
+
+    sha1("blob " + filesize + "\0" + data)
 
