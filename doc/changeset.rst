@@ -34,7 +34,7 @@ Remarks: Changesets form a directed acyclic graph.
 Changeset
 =========
 
-  * id
+  * id: 160-bit number usually representing as 40 digit hex string (a SHA1 hash)
   * parents = ordered list of ids
   * timestamp
   * author
@@ -44,16 +44,18 @@ Changeset
 ChangeManifest
 ==============
 
-  * object_identifier
-  * change_type: delete | update | create | (move? copy?)
-  * representation_type: full | diff
+  * changes: dict of ChangeObjects keyed by object_id
 
 ChangeObject
 ============
 
-  * object_identifier
-  * change_type: delete | update | create | (move? copy?)
-  * representation_type: full | diff
+  * object_id - a tuple forming a unique identifier for this object *within*
+    the domain model
+  * operation_type: delete | update | create | (move? copy?)
+  * data_type: full | diff | snapshot
+
+    * This relates to how changes are stored (copy-on-write versus diff etc) - see :doc:`theory`
+    
   * representation: serialization of this change either as full dump of object (copy-on-write) or diff
 
 Doing Things
@@ -77,9 +79,20 @@ process:
   3. If using diff: find all ChangeObjects with changesets <= {given-changeset}
      and concatenate. Return resulting object.
 
+Get all changes to a given object
+---------------------------------
+
+Search ChangeObjects by object_id, and order by the order on Changesets (if
+there is one).
 
 Merging
 -------
+
+
+Pending Changes
+---------------
+
+This is a common use case where you want to record changes but only make them visible when approved in some way. It can also be useful if you are worried about spam revisions.
 
 
 Questions
@@ -113,9 +126,11 @@ Reading
 Mercurial
 ---------
 
-Basic overview of the Mercurial model: http://mercurial.selenic.com/wiki/UnderstandingMercurial
+Overview of the Mercurial model:
 
-Longer overview: http://mercurial.selenic.com/wiki/Mercurial?action=AttachFile&do=get&target=Hague2009.pdf
+  * http://mercurial.selenic.com/wiki/UnderstandingMercurial
+  * http://hgbook.red-bean.com/read/behind-the-scenes.html
+  * (Longer) http://mercurial.selenic.com/wiki/Mercurial?action=AttachFile&do=get&target=Hague2009.pdf
 
 Key concepts:
 

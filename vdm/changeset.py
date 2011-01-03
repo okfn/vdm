@@ -2,12 +2,14 @@ import hashlib
 
 class Changeset(object):
     '''Models a list of changes.'''
+    NULL_HASH = '0' * 40
     INIT_METADATA = {
         'id': None,
         # no parents = a single null hash
-        'parents': ['0' * 40],
+        'parents': [NULL_HASH],
         'author': '',
         'message': '',
+        'timestamp': None
         }
    
     def __init__(self):

@@ -13,7 +13,8 @@ class TestChangeset:
             'id': None,
             'parents': ['0' * 40],
             'author': '',
-            'message': ''
+            'message': '',
+            'timestamp': None
             }, sort_keys=True)
         assert out == expected
         assert cs.manifest != None
