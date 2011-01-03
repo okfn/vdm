@@ -19,7 +19,8 @@ Key Concepts
     * includes metadata about this change
     * aggregates changes to domain objects in a ChangesetManifest
 
-  * ChangesetManifest - a manifest with a (structured) list of ChangeObject(s)
+  * [omitted - exists implicitly rather than explicitly] ChangesetManifest - a
+    manifest with a (structured) list of ChangeObject(s)
   * ChangeObject - a description of a change to a domain object
   * Working Copy - the representation of the current state of the system
     resulting the application of specified set of changesets
@@ -39,12 +40,8 @@ Changeset
   * timestamp
   * author
   * message
-  * meta - arbitrary key/value metadata
-
-ChangeManifest
-==============
-
-  * changes: dict of ChangeObjects keyed by object_id
+  * metadata - arbitrary key/value metadata
+  * manifest - dict of ChangeObjects keyed by object_id
 
 ChangeObject
 ============

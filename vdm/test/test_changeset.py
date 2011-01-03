@@ -1,4 +1,4 @@
-from vdm.changeset import Changeset, ChangesetManifest, ChangeObject
+from vdm.changeset import Changeset, ChangeObject
 import json
 
 class TestChangeset:
@@ -6,18 +6,10 @@ class TestChangeset:
         cs = Changeset()
         assert cs.id == None
         assert cs.parents == [ '0' * 40 ]
-        assert cs.author == ''
-        assert cs.message == ''
-        out = json.dumps(cs.metadata, sort_keys=True) 
-        expected = json.dumps({
-            'id': None,
-            'parents': ['0' * 40],
-            'author': '',
-            'message': '',
-            'timestamp': None
-            }, sort_keys=True)
-        assert out == expected
-        assert cs.manifest != None
+        assert cs.author == None
+        assert cs.message == None
+        assert cs.metadata == {}
+        assert cs.manifest == {}
 
     def test_02(self):
         co = ChangeObject()
@@ -28,13 +20,11 @@ class TestChangeset:
             'field1': 'aaaaaa',
             'field2': 'bbbbbb'
             }, sort_keys=True)
-        cm = ChangesetManifest()
-        cm.add_change(co)
         cs = Changeset()
-        cs.manifest = cm
+        cs.manifest[co.object_id] = co
         cs.save()
-        assert cs.id == '148c918ee2b4b027eda28601f28a30138927f76f', cs.id
 
-        assert len(cm.changes) == 1
-        assert cm.changes[objectid] == co
+        assert cs.id == '148c918ee2b4b027eda28601f28a30138927f76f', cs.id
+        assert len(cs.manifest) == 1
+        assert cs.manifest[objectid] == co
 

@@ -13,57 +13,25 @@ class Changeset(object):
         }
    
     def __init__(self):
-        self.metadata = dict(self.INIT_METADATA)
-        self.manifest = ChangesetManifest()
-
-    @property
-    def id(self):
-        return self.metadata['id']
-
-    @property
-    def parents(self):
-        return self.metadata['parents']
-
-    @parents.setter
-    def parents(self, value):
-        self.metadata['parents'] = list(value)
-
-    @property
-    def author(self):
-        return self.metadata['author']
-
-    @author.setter
-    def author(self, value):
-        self.metadata['author'] = value
-
-    @property
-    def message(self):
-        return self.metadata['message']
-
-    @message.setter
-    def message(self, value):
-        self.metadata['message'] = value
+        self.id = None
+        self.parents = [self.NULL_HASH]
+        self.author = None
+        self.message = None
+        self.timestamp = None
+        self.metadata = {}
+        self.manifest = {}
 
     def save(self):
         self.compute_id()
 
     def compute_id(self):
-        value_to_hash = ''.join(self.parents) + self.manifest.hash
-        self.metadata['id'] = hashlib.sha1(value_to_hash).hexdigest()
+        value_to_hash = ''.join(self.parents) + self.compute_manifest_hash()
+        self.id = hashlib.sha1(value_to_hash).hexdigest()
 
-
-class ChangesetManifest(object):
-    def __init__(self):
-        self.changes = {}
-
-    def add_change(self, change_object):
-        self.changes[change_object.object_id] = change_object
-
-    @property
-    def hash(self):
-        change_object_hashes = [ self.changes[change_object_id].hash
+    def compute_manifest_hash(self):
+        change_object_hashes = [ self.manifest[change_object_id].hash
             for change_object_id
-            in sorted(self.changes.keys()) ]
+            in sorted(self.manifest.keys()) ]
         out = ''.join(change_object_hashes)
         return hashlib.sha1(out).hexdigest()
 
@@ -84,6 +52,6 @@ class ChangeObject(object):
 
     @property
     def hash(self):
-        data_to_hash = self.operation_type + self.data
+        data_to_hash = self.operation_type + (self.data or '')
         return hashlib.sha1(data_to_hash).hexdigest()
 
