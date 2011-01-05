@@ -34,7 +34,7 @@ def uuidstr(): return str(uuid.uuid4())
 package_table = Table('package', metadata,
         # Column('id', Integer, primary_key=True),
         Column('id', String(36), default=uuidstr, primary_key=True),
-        Column('name', String(100)),
+        Column('name', String(100), unique=True),
         Column('title', String(100)),
         Column('license_id', Integer, ForeignKey('license.id')),
         Column('notes', UnicodeText),
