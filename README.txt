@@ -15,9 +15,14 @@ open vdm/__init__.py or do (after installation)::
 For Developers
 ==============
 
-To run tests you will need to have a set up a postgresql database with user
-tester and password pass (see vdm/sqlalchemy/demo.py). You can then run the
-tests using nosetests::
+Tests currently pass against postgres or sqlite (see 'TEST_ENGINE' setting
+in vdm/sqlalchemy/demo.py).
+
+To run tests with postgres you will need to have a set up a postgresql
+database with user 'tester' and password 'pass' (see settings in
+vdm/sqlalchemy/demo.py). 
+
+Run the tests using nosetests::
 
     $ nosestests vdm/sqlalchemy
 

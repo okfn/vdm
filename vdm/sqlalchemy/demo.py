@@ -13,8 +13,18 @@ from sqlalchemy import __version__ as sqla_version
 
 import vdm.sqlalchemy
 
-# engine = create_engine('sqlite:///:memory:')
-engine = create_engine('postgres://tester:pass@localhost/vdmtest', pool_threadlocal=True)
+TEST_ENGINE = "postgres"  # or "sqlite"
+
+if TEST_ENGINE == "postgres":
+    engine = create_engine('postgres://tester:pass@localhost/vdmtest',
+                           pool_threadlocal=True)
+else:
+    # setting the isolation_level is a hack required for sqlite support
+    # until http://code.google.com/p/pysqlite/issues/detail?id=24 is
+    # fixed.
+    engine = create_engine('sqlite:///:memory:',
+                           connect_args={'isolation_level': None})
+
 metadata = MetaData(bind=engine)
 
 ## VDM-specific tables
