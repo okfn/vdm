@@ -2,6 +2,7 @@ from datetime import datetime
 import difflib
 import uuid
 import logging
+import weakref
 
 from sqlalchemy import *
 
@@ -488,7 +489,9 @@ class Revisioner(MapperExtension):
         # Sometimes (not predictably) the after_update method is called
         # *after* the next instance's before_update! So to avoid this,
         # we store the instance with the is_changed flag.
-        self._is_changed = {} # instance:is_changed
+        # It is a weak key dictionary to make sure the instance is garbage
+        # collected.
+        self._is_changed = weakref.WeakKeyDictionary() # instance:is_changed
 
     def revisioning_disabled(self, instance):
         # logger.debug('revisioning_disabled: %s' % instance)
