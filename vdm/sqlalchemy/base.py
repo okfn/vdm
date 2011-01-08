@@ -4,6 +4,8 @@ import uuid
 import logging
 
 from sqlalchemy import *
+from sqlalchemy.orm.attributes import get_history
+from sqlalchemy import __version__ as sqav
 
 from sqla import SQLAlchemyMixin
 from sqla import copy_column, copy_table_columns, copy_table
@@ -533,25 +535,16 @@ class Revisioner(MapperExtension):
         instance.revision_id = current_rev.id
 
     def check_real_change(self, instance, mapper, connection):
-        logger.debug('check_real_change: %s' % instance)
-        table = mapper.tables[0]
-        colname = 'id'
-        ctycol = table.c[colname]
-        ctyval = getattr(instance, colname)
-        values = connection.execute(table.select(ctycol==ctyval)).fetchone() 
-        if values is None: # object not yet created
-            logger.debug('check_real_change: True (object not yet created)')
-            return True
-
-        # (Based on Elixir's solution to this problem)
-        # SA might've flagged this for an update even though it didn't change.
-        # This occurs when a relation is updated, thus marking this instance
-        # for a save/update operation. We check here against the last version
-        # to ensure we really should save this version and update the version
-        # data.
+        # check each attribute to see if they have been changed
+        if sqav.startswith("0.4"):
+            state = instance._state
+        else:
+            state = instance
         for key in instance.revisioned_fields():
-            if getattr(instance, key) != values[key]:
-                # the instance was really updated, so we create a new version
+            (added, unchanged, deleted) = get_history(state,
+                                                      key,
+                                                      passive = False)
+            if added or deleted:
                 logger.debug('check_real_change: True')
                 return True
         logger.debug('check_real_change: False')
