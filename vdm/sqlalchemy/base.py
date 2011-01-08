@@ -40,9 +40,12 @@ class SQLAlchemySession(object):
         self.setattr(session, 'HEAD', True)
         self.setattr(session, 'revision', revision)
         if revision.id is None:
-            session.begin_nested()
+            # make uuid here so that if other objects in this session are flushed
+            # at the same time they know thier revision id
+            revision.id = make_uuid()
+            # there was a begin_nested here but that just caused flush anyway.
             session.add(revision)
-            session.commit()
+            session.flush()
 
     @classmethod
     def get_revision(self, session):
