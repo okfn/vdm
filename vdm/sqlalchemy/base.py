@@ -536,6 +536,7 @@ class Revisioner(MapperExtension):
 
     def check_real_change(self, instance, mapper, connection):
         # check each attribute to see if they have been changed
+        logger.debug('check_real_change: %s' % instance)
         if sqav.startswith("0.4"):
             state = instance._state
         else:
