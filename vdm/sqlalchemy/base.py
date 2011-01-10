@@ -2,8 +2,11 @@ from datetime import datetime
 import difflib
 import uuid
 import logging
+import weakref
 
 from sqlalchemy import *
+from sqlalchemy.orm.attributes import get_history
+from sqlalchemy import __version__ as sqav
 
 from sqla import SQLAlchemyMixin
 from sqla import copy_column, copy_table_columns, copy_table
@@ -40,9 +43,12 @@ class SQLAlchemySession(object):
         self.setattr(session, 'HEAD', True)
         self.setattr(session, 'revision', revision)
         if revision.id is None:
-            session.begin_nested()
+            # make uuid here so that if other objects in this session are flushed
+            # at the same time they know thier revision id
+            revision.id = make_uuid()
+            # there was a begin_nested here but that just caused flush anyway.
             session.add(revision)
-            session.commit()
+            session.flush()
 
     @classmethod
     def get_revision(self, session):
@@ -488,7 +494,9 @@ class Revisioner(MapperExtension):
         # Sometimes (not predictably) the after_update method is called
         # *after* the next instance's before_update! So to avoid this,
         # we store the instance with the is_changed flag.
-        self._is_changed = {} # instance:is_changed
+        # It is a weak key dictionary to make sure the instance is garbage
+        # collected.
+        self._is_changed = weakref.WeakKeyDictionary() # instance:is_changed
 
     def revisioning_disabled(self, instance):
         # logger.debug('revisioning_disabled: %s' % instance)
@@ -533,25 +541,17 @@ class Revisioner(MapperExtension):
         instance.revision_id = current_rev.id
 
     def check_real_change(self, instance, mapper, connection):
+        # check each attribute to see if they have been changed
         logger.debug('check_real_change: %s' % instance)
-        table = mapper.tables[0]
-        colname = 'id'
-        ctycol = table.c[colname]
-        ctyval = getattr(instance, colname)
-        values = connection.execute(table.select(ctycol==ctyval)).fetchone() 
-        if values is None: # object not yet created
-            logger.debug('check_real_change: True (object not yet created)')
-            return True
-
-        # (Based on Elixir's solution to this problem)
-        # SA might've flagged this for an update even though it didn't change.
-        # This occurs when a relation is updated, thus marking this instance
-        # for a save/update operation. We check here against the last version
-        # to ensure we really should save this version and update the version
-        # data.
+        if sqav.startswith("0.4"):
+            state = instance._state
+        else:
+            state = instance
         for key in instance.revisioned_fields():
-            if getattr(instance, key) != values[key]:
-                # the instance was really updated, so we create a new version
+            (added, unchanged, deleted) = get_history(state,
+                                                      key,
+                                                      passive = False)
+            if added or deleted:
                 logger.debug('check_real_change: True')
                 return True
         logger.debug('check_real_change: False')
