@@ -37,6 +37,10 @@ def copy_column(name, src_table, dest_table):
     TODO: stuff other than fks (e.g. constraints such as uniqueness)
     '''
     col = src_table.c[name]
+    if col.unique == True:
+        # don't copy across unique constraints, as different versions
+        # of an object may have identical column values
+        col.unique = False
     dest_table.append_column(col.copy())
     # only get it once we have a parent table
     newcol = dest_table.c[name]
