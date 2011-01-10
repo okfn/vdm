@@ -1,10 +1,12 @@
 HEAD
 ====
 
-v0.8 2010-??-??
+v0.8 2010-01-10
 ===============
 
   * Remove (long-deprecated) SQLObject code from source tree
+  * Support for SQLAlchemy 0.6 and Sqlite (in addition to PostgreSQL) (#901)
+  * Minor bugfixes (#898 #899 #900)
 
 v0.7 2010-05-11
 ===============
