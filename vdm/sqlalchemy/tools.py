@@ -171,6 +171,7 @@ class Repository(object):
         logger.debug('Purging revision: %s' % revision.id)
         to_purge = []
         SQLAlchemySession.setattr(self.session, 'revisioning_disabled', True)
+        self.session.autoflush = False
         for o in self.versioned_objects:
             revobj = o.__revision_class__
             items = self.session.query(revobj).filter_by(revision=revision).all()
