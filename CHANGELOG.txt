@@ -1,15 +1,21 @@
 HEAD
 ====
 
-v0.8 2010-??-??
+v0.9 2010-01-11
 ===============
-
+ 
+  * Support for SQLAlchemy 0.6 and SQLite (in addition to PostgreSQL) (#901)
+  * Minor bugfixes (#898 #899 #900)
   * Remove (long-deprecated) SQLObject code from source tree
+
+v0.8 2010-01-10
+===============
+  * Recalled 2010-01-11
 
 v0.7 2010-05-11
 ===============
 
-  * Support for SQLALchemy v0.5 (and maybe 0.6 - 0.6 not tested) (ticket:81)
+  * Support for SQLALchemy v0.5 (ticket:81)
   * Improved diff support: diff on object creation (ticket:267) and reorganised
     diff interface to allow diffing of related domain objects
   * Minor bugfixes (cset:984d053fc15a/vdm, cset:0a7d889c5c1a/vdm)
