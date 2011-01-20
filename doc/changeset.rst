@@ -128,6 +128,7 @@ Overview of the Mercurial model:
   * http://mercurial.selenic.com/wiki/UnderstandingMercurial
   * http://hgbook.red-bean.com/read/behind-the-scenes.html
   * (Longer) http://mercurial.selenic.com/wiki/Mercurial?action=AttachFile&do=get&target=Hague2009.pdf
+  * Octopus merges: http://arrenbrecht.ch/mercurial/pbranch/octopus.htm
 
 Key concepts:
 
