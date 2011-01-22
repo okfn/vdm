@@ -1,3 +1,4 @@
+from vdm import json
 import hashlib
 
 class Changeset(object):
@@ -49,9 +50,12 @@ class ChangeObject(object):
         self.data_type = self.DataType.FULL
         self.operation_type = self.OperationType.CREATE
         self.data = None
+        self.object_id = None
 
     @property
     def hash(self):
-        data_to_hash = self.operation_type + (self.data or '')
+        data_to_hash = self.operation_type
+        data_to_hash += '::' + json.dumps(self.object_id, sort_keys=True)
+        data_to_hash += '::' + json.dumps(self.data, sort_keys=True)
         return hashlib.sha1(data_to_hash).hexdigest()
 

@@ -24,7 +24,7 @@ class TestChangeset:
         cs.manifest[co.object_id] = co
         cs.save()
 
-        assert cs.id == '148c918ee2b4b027eda28601f28a30138927f76f', cs.id
+        assert cs.id == '0925a971dc9d0ad3fdf1f6fca7d26ce6bb5e6f95', cs.id
         assert len(cs.manifest) == 1
         assert cs.manifest[objectid] == co
 

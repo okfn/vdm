@@ -29,9 +29,29 @@ class JsonType(types.TypeDecorator):
     def copy(self):
         return JsonType(self.impl.length)
 
+class JsonTypeTuple(JsonType):
+    def process_result_value(self, value, engine):
+        if value is None:
+            return None
+        else:
+            out = json.loads(value)
+            if isinstance(out, list):
+                out = tuple(out)
+            return out
+
+    def copy(self):
+        return JsonTypeTuple(self.impl.length)
+
 
 class Changeset(_Changeset):
-    pass
+    @classmethod
+    def youngest(self, session):
+        '''Get the youngest (most recent) changeset.
+
+        If session is not provided assume there is a contextual session.
+        '''
+        q = session.query(self)
+        return q.first()
 
 class ChangeObject(_ChangeObject):
     pass
@@ -47,20 +67,24 @@ def make_tables(metadata):
     change_object_table = Table('changeset_object', metadata,
             Column('changeset_id', String(40), ForeignKey('changeset.id'),
                 primary_key=True),
-            Column('object_id', UnicodeText, primary_key=True),
-            Column('operation_type', String(30), primary_key=True),
-            Column('data_type', String(30), primary_key=True),
-            Column('data', UnicodeText, primary_key=True),
+            Column('object_id', JsonTypeTuple, primary_key=True),
+            Column('operation_type', String(30)),
+            Column('data_type', String(30)),
+            Column('data', JsonType),
             )
 
     return (changeset_table, change_object_table)
 
 def setup_changeset(metadata, mapper):
     changeset_table, change_object_table = make_tables(metadata)
+
     mapper(Changeset, changeset_table, properties={
         'manifest': relationship(ChangeObject, backref='changeset',
             collection_class=column_mapped_collection(change_object_table.c.object_id))
-        })
+        },
+        order_by=changeset_table.c.timestamp.desc()
+        )
+
     mapper(ChangeObject, change_object_table, properties={
         })
 

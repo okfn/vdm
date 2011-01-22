@@ -193,3 +193,9 @@ given Revision.
 '''
 __version__ = '0.8'
 __description__ = 'A versioned domain model framework.'
+
+try:
+    import json
+except ImportError:
+    import simplejson as json
+

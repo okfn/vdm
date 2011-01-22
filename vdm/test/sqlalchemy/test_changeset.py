@@ -35,19 +35,19 @@ class TestChangeset:
 
     def test_02(self):
         co = ChangeObject()
-        objectid = json.dumps((u'package', 1,2,3))
+        objectid = (u'package', 1,2,3)
         co.object_id = objectid
         co.operation = ChangeObject.OperationType.CREATE
-        co.data = json.dumps({
+        co.data = {
             'field1': 'aaaaaa',
             'field2': 'bbbbbb'
-            }, sort_keys=True)
+            }
         cs = Changeset()
         cs.manifest[co.object_id] = co
         cs.save()
         
-        cs_id = '148c918ee2b4b027eda28601f28a30138927f76f'
-        assert cs.id == cs_id
+        cs_id = '2a58c78bd6c17d49ffb1fe1afb2d09a93fdd5b2a'
+        assert cs.id == cs_id, cs.id
         assert len(cs.manifest) == 1
         assert cs.manifest[objectid] == co
         
