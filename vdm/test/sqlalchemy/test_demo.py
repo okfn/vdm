@@ -8,11 +8,7 @@ from sqlalchemy.orm import object_session, class_mapper
 import vdm.sqlalchemy
 from demo import *
 
-from sqlalchemy import __version__ as sqav
-if sqav.startswith("0.4"):
-    _clear = Session.clear
-else:
-    _clear = Session.expunge_all
+_clear = Session.expunge_all
     
 class Test_01_SQLAlchemySession:
     @classmethod

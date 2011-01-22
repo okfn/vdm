@@ -122,12 +122,11 @@ from sqlalchemy.orm import relation, backref
 # both options now work
 # Session = scoped_session(sessionmaker(autoflush=False, transactional=True))
 # this is the more testing one ...
-if sqla_version <= '0.4.99':
-    Session = scoped_session(sessionmaker(autoflush=True, transactional=True))
-else:
-    Session = scoped_session(sessionmaker(autoflush=True,
-                                          expire_on_commit=False,
-                                          autocommit=False))
+Session = scoped_session(
+            sessionmaker(autoflush=True,
+            expire_on_commit=False,
+            autocommit=False
+            ))
 
 # mapper = Session.mapper
 from sqlalchemy.orm import mapper
