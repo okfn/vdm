@@ -55,9 +55,8 @@ def make_tables(metadata):
 
     return (changeset_table, change_object_table)
 
-def setup_changeset(metadata):
+def setup_changeset(metadata, mapper):
     changeset_table, change_object_table = make_tables(metadata)
-    from sqlalchemy.orm import mapper
     mapper(Changeset, changeset_table, properties={
         'manifest': relationship(ChangeObject, backref='changeset',
             collection_class=column_mapped_collection(change_object_table.c.object_id))

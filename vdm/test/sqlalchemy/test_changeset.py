@@ -1,6 +1,6 @@
 import json
 from sqlalchemy import *
-from sqlalchemy.orm import scoped_session, sessionmaker, create_session
+from sqlalchemy.orm import scoped_session, sessionmaker, create_session, mapper
 
 from vdm.sqlalchemy.changeset import *
 Session = scoped_session(
@@ -12,7 +12,7 @@ class TestChangeset:
     def setup_class(self):
         engine = create_engine('sqlite://')
         metadata = MetaData(bind=engine)
-        setup_changeset(metadata)
+        setup_changeset(metadata, mapper)
         metadata.create_all()
 
     def test_01(self):
