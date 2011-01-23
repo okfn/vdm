@@ -79,8 +79,7 @@ def setup_changeset(metadata, mapper):
     changeset_table, change_object_table = make_tables(metadata)
 
     mapper(Changeset, changeset_table, properties={
-        'manifest': relationship(ChangeObject, backref='changeset',
-            collection_class=column_mapped_collection(change_object_table.c.object_id))
+        'manifest': relationship(ChangeObject, backref='changeset')
         },
         order_by=changeset_table.c.timestamp.desc()
         )

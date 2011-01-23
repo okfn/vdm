@@ -9,7 +9,7 @@ class TestChangeset:
         assert cs.author == None
         assert cs.message == None
         assert cs.metadata == {}
-        assert cs.manifest == {}
+        assert cs.manifest == []
 
     def test_02(self):
         co = ChangeObject()
@@ -21,10 +21,10 @@ class TestChangeset:
             'field2': 'bbbbbb'
             }, sort_keys=True)
         cs = Changeset()
-        cs.manifest[co.object_id] = co
+        cs.manifest.append(co)
         cs.save()
 
         assert cs.id == '0925a971dc9d0ad3fdf1f6fca7d26ce6bb5e6f95', cs.id
         assert len(cs.manifest) == 1
-        assert cs.manifest[objectid] == co
+        assert cs.manifest[0] == co
 

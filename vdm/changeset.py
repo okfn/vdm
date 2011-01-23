@@ -20,7 +20,7 @@ class Changeset(object):
         self.message = None
         self.timestamp = None
         self.metadata = {}
-        self.manifest = {}
+        self.manifest = []
 
     def save(self):
         self.compute_id()
@@ -30,9 +30,9 @@ class Changeset(object):
         self.id = hashlib.sha1(value_to_hash).hexdigest()
 
     def compute_manifest_hash(self):
-        change_object_hashes = [ self.manifest[change_object_id].hash
-            for change_object_id
-            in sorted(self.manifest.keys()) ]
+        change_object_hashes = [ change_object.hash
+            for change_object
+            in self.manifest ]
         out = ''.join(change_object_hashes)
         return hashlib.sha1(out).hexdigest()
 

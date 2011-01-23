@@ -22,7 +22,7 @@ class TestChangeset:
         assert cs.author == None, '%s' % cs.author
         assert cs.message == None
         assert cs.metadata == {}
-        assert cs.manifest == {}
+        assert cs.manifest == []
         cs.save()
         assert cs.id == '9feb6d00f5bd21b036e7a3d2f8e01ac6dd507fb6'
 
@@ -43,13 +43,13 @@ class TestChangeset:
             'field2': 'bbbbbb'
             }
         cs = Changeset()
-        cs.manifest[co.object_id] = co
+        cs.manifest.append(co)
         cs.save()
         
         cs_id = '2a58c78bd6c17d49ffb1fe1afb2d09a93fdd5b2a'
         assert cs.id == cs_id, cs.id
         assert len(cs.manifest) == 1
-        assert cs.manifest[objectid] == co
+        assert cs.manifest[0]
         
         Session.add_all([cs, co])
         Session.commit()
