@@ -93,24 +93,24 @@ class Test_02_Versioning:
     def teardown_class(self):
         Session.remove()
 
-    def test_revisions_exist(self):
+    def test_01_revisions_exist(self):
         revs = Session.query(Revision).all()
         assert len(revs) == 2
         # also check order (youngest first)
         assert revs[0].timestamp > revs[1].timestamp
 
-    def test_revision_youngest(self):
+    def test_02_revision_youngest(self):
         rev = Revision.youngest(Session)
         assert rev.timestamp == self.ts2
 
-    def test_basic(self):
+    def test_03_basic(self):
         assert Session.query(License).count() == 2, Session.query(License).count()
         assert Session.query(Package).count() == 2, Session.query(Package).count()
         assert hasattr(LicenseRevision, 'revision_id')
         assert Session.query(LicenseRevision).count() == 3, Session.query(LicenseRevision).count()
         assert Session.query(PackageRevision).count() == 4, Session.query(PackageRevision).count()
 
-    def test_all_revisions(self):
+    def test_04_all_revisions(self):
         p1 = Session.query(Package).filter_by(name=self.name1).one()
         assert len(p1.all_revisions) == 2
         # problem here is that it might pass even if broken because ordering of
@@ -118,7 +118,7 @@ class Test_02_Versioning:
         revs = [ pr.revision for pr in p1.all_revisions ]
         assert revs[0].timestamp > revs[1].timestamp, revs
 
-    def test_basic_2(self):
+    def test_05_basic_2(self):
         # should be at HEAD (i.e. rev2) by default 
         p1 = Session.query(Package).filter_by(name=self.name1).one()
         assert p1.license.open == False
@@ -126,7 +126,7 @@ class Test_02_Versioning:
         # assert p1.tags == []
         assert len(p1.tags) == 1
 
-    def test_basic_continuity(self):
+    def test_06_basic_continuity(self):
         p1 = Session.query(Package).filter_by(name=self.name1).one()
         pr1 = Session.query(PackageRevision).filter_by(name=self.name1).first()
         table = class_mapper(PackageRevision).mapped_table
@@ -134,46 +134,46 @@ class Test_02_Versioning:
         print pr1.continuity_id
         assert pr1.continuity == p1
 
-    def test_basic_state(self):
+    def test_07_basic_state(self):
         p1 = Session.query(Package).filter_by(name=self.name1).one()
         p2 = Session.query(Package).filter_by(name=self.name2).one()
         assert p1.state
         assert p1.state == State.ACTIVE
         assert p2.state == State.DELETED
 
-    def test_versioning_0(self):
+    def test_08_versioning_0(self):
         p1 = Session.query(Package).filter_by(name=self.name1).one()
         rev1 = Session.query(Revision).get(self.rev1_id)
         p1r1 = p1.get_as_of(rev1)
         assert p1r1.continuity == p1
 
-    def test_versioning_1(self):
+    def test_09_versioning_1(self):
         p1 = Session.query(Package).filter_by(name=self.name1).one()
         rev1 = Session.query(Revision).get(self.rev1_id)
         p1r1 = p1.get_as_of(rev1)
         assert p1r1.name == self.name1
         assert p1r1.title == self.title1
 
-    def test_traversal_normal_fks_and_state_at_same_time(self):
+    def test_10_traversal_normal_fks_and_state_at_same_time(self):
         p2 = Session.query(Package).filter_by(name=self.name2).one()
         rev1 = Session.query(Revision).get(self.rev1_id)
         p2r1 = p2.get_as_of(rev1)
         assert p2r1.state == State.ACTIVE
 
-    def test_versioning_traversal_fks(self):
+    def test_11_versioning_traversal_fks(self):
         p1 = Session.query(Package).filter_by(name=self.name1).one()
         rev1 = Session.query(Revision).get(self.rev1_id)
         p1r1 = p1.get_as_of(rev1)
         assert p1r1.license.open == True
 
-    def test_versioning_m2m_1(self):
+    def test_12_versioning_m2m_1(self):
         p1 = Session.query(Package).filter_by(name=self.name1).one()
         rev1 = Session.query(Revision).get(self.rev1_id)
         ptag = p1.package_tags[0]
         # does not exist
         assert ptag.get_as_of(rev1) == None
 
-    def test_versioning_m2m(self):
+    def test_13_versioning_m2m(self):
         p1 = Session.query(Package).filter_by(name=self.name1).one()
         rev1 = Session.query(Revision).get(self.rev1_id)
         p1r1 = p1.get_as_of(rev1)
@@ -183,11 +183,11 @@ class Test_02_Versioning:
         assert len(p1.tags) == 0
         assert len(p1r1.tags) == 0
     
-    def test_revision_has_state(self):
+    def test_14_revision_has_state(self):
         rev1 = Session.query(Revision).get(self.rev1_id)
         assert rev1.state == State.ACTIVE
 
-    def test_diff(self):
+    def test_15_diff(self):
         p1 = Session.query(Package).filter_by(name=self.name1).one()
         pr2, pr1 = p1.all_revisions
         # pr1, pr2 = prs[::-1]
@@ -203,7 +203,7 @@ class Test_02_Versioning:
         diff2 = p1.diff()
         assert diff2 == diff, (diff2, diff)
 
-    def test_diff_2(self):
+    def test_16_diff_2(self):
         '''Test diffing at a revision where just created.'''
         p1 = Session.query(Package).filter_by(name=self.name1).one()
         pr2, pr1 = p1.all_revisions
