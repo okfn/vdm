@@ -1,8 +1,9 @@
 import json
-from sqlalchemy import *
-from sqlalchemy.orm import scoped_session, sessionmaker, create_session, mapper
+from sqlalchemy import MetaData, create_engine
+from sqlalchemy.orm import scoped_session, sessionmaker, mapper, object_mapper
+from sqlalchemy.orm.exc import UnmappedInstanceError
 
-from vdm.sqlalchemy.changeset import *
+from vdm.sqlalchemy.changeset import Changeset, ChangeObject, setup_changeset
 Session = scoped_session(
     sessionmaker(autoflush=True, expire_on_commit=False, autocommit=False)
     )
@@ -12,7 +13,11 @@ class TestChangeset:
     def setup_class(self):
         engine = create_engine('sqlite://')
         metadata = MetaData(bind=engine)
-        setup_changeset(metadata, mapper)
+        # to avoid conflicts due to having already called setup_changeset in e.g. demo.py
+        try:
+            object_mapper(Changeset())
+        except UnmappedInstanceError:
+            setup_changeset(metadata, mapper)
         metadata.create_all()
 
     def test_01(self):

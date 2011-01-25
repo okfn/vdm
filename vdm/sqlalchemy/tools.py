@@ -37,7 +37,8 @@ from sqlalchemy.orm import class_mapper
 from sqlalchemy.orm import object_session
 from sqlalchemy import __version__ as sqla_version
 
-from base import SQLAlchemySession, State, Revision
+from .base import SQLAlchemySession
+from .changeset import Changeset
 
 class Repository(object):
     '''Manage repository-wide type changes for versioned domain models.
@@ -118,7 +119,7 @@ class Repository(object):
         as transactional (every commit is paired with a begin)
         <http://groups.google.com/group/sqlalchemy/browse_thread/thread/a54ce150b33517db/17587ca675ab3674>
         '''
-        rev = Revision()
+        rev = Changeset()
         self.session.add(rev)
         SQLAlchemySession.set_revision(self.session, rev)             
         return rev
@@ -126,7 +127,7 @@ class Repository(object):
     def youngest_revision(self):
         '''Get the youngest (most recent) revision.'''
         q = self.history()
-        q = q.order_by(Revision.timestamp.desc())
+        q = q.order_by(Changeset.timestamp.desc())
         return q.first()
         
     def history(self):
@@ -134,7 +135,7 @@ class Repository(object):
         
         @return: sqlalchemy query object.
         '''
-        return self.session.query(Revision).filter_by(state=State.ACTIVE)
+        return self.session.query(Changeset).filter_by(state=State.ACTIVE)
 
     def list_changes(self, revision):
         '''List all objects changed by this `revision`.
@@ -158,7 +159,7 @@ class Repository(object):
         Summary of the Algorithm
         ------------------------
 
-        1. list all RevisionObjects affected by this revision
+        1. list all ChangesetObjects affected by this revision
         2. check continuity objects and cascade on everything else ?
             1. crudely get all object revisions associated with this
             2. then check whether this is the only revision and delete the
@@ -181,7 +182,7 @@ class Repository(object):
                 if continuity.revision == revision: # need to change continuity
                     trevobjs = self.session.query(revobj).join('revision').  filter(
                             revobj.continuity==continuity
-                            ).order_by(Revision.timestamp.desc()).limit(2).all()
+                            ).order_by(Changeset.timestamp.desc()).limit(2).all()
                     if len(trevobjs) == 0:
                         raise Exception('Should have at least one revision.')
                     if len(trevobjs) == 1:
