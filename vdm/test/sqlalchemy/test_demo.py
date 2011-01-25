@@ -71,6 +71,7 @@ class Test_02_Versioning:
         session.commit()
         # can only get it after the flush
         self.rev1_id = rev1.id
+        self.p2_objid = get_object_id(p2)
         _clear()
         Session.remove()
 
@@ -133,28 +134,33 @@ class Test_02_Versioning:
         # TODO: reinstate tags tests ...
         # assert len(p1.tags) == 1
 
-#    def test_07_basic_state(self):
-#        p1 = Session.query(Package).filter_by(name=self.name1).one()
-#        p2 = Session.query(Package).filter_by(name=self.name2).one()
-#        changeobjects = all_revisions(p1)
-#        assert changeobjects[-1]
-#        assert p1.state
-#        assert p1.state == State.ACTIVE
-#        assert p2.state == State.DELETED
-#
-#    def test_08_versioning_0(self):
-#        p1 = Session.query(Package).filter_by(name=self.name1).one()
-#        rev1 = Session.query(Revision).get(self.rev1_id)
-#        p1r1 = p1.get_as_of(rev1)
-#        assert p1r1.continuity == p1
-#
-#    def test_09_versioning_1(self):
-#        p1 = Session.query(Package).filter_by(name=self.name1).one()
-#        rev1 = Session.query(Revision).get(self.rev1_id)
-#        p1r1 = p1.get_as_of(rev1)
-#        assert p1r1.name == self.name1
-#        assert p1r1.title == self.title1
-#
+    def test_07_operation_type(self):
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
+        changeobjects = all_revisions(p1)
+
+        _create = ChangeObject.OperationType.CREATE
+        optype = changeobjects[-1].operation_type 
+        assert optype == _create, optype
+
+        optype = changeobjects[0].operation_type 
+        assert optype == ChangeObject.OperationType.UPDATE
+
+        p2_changeobjects = Session.query(ChangeObject).filter_by(object_id=self.p2_objid).all()
+        p2_changeobjects = sorted(
+                p2_changeobjects,
+                lambda x,y: cmp(x.changeset.timestamp, y.changeset.timestamp)
+                )
+        optype = p2_changeobjects[-1].operation_type
+        print p2_changeobjects
+        assert optype == ChangeObject.OperationType.DELETE, optype
+
+    def test_09_versioning(self):
+        p1 = Session.query(Package).filter_by(name=self.name1).one()
+        changeobjects = all_revisions(p1)
+        co = changeobjects[-1]
+        assert co.data['name'] == self.name1
+        assert co.data['title'] == self.title1
+
 #    def test_10_traversal_normal_fks_and_state_at_same_time(self):
 #        p2 = Session.query(Package).filter_by(name=self.name2).one()
 #        rev1 = Session.query(Revision).get(self.rev1_id)

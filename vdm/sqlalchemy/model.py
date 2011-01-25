@@ -60,9 +60,12 @@ def get_object_id(obj):
 
 # Questions: when does this create the first version
 
-def create_version(obj, session, deleted=False, created=False):
+def create_version(obj, session,
+        operation_type=ChangeObject.OperationType.UPDATE
+        ):
     obj_mapper = object_mapper(obj)
-    # very inefficient ...
+    ## TODO: very inefficient to do this each time (would like to do this when
+    ## setting up object)
     if not hasattr(obj, '__revisioned_attributes__'):
         set_revisioned_attributes(obj_mapper)
 
@@ -116,7 +119,7 @@ def create_version(obj, session, deleted=False, created=False):
                 obj_changed = True
                 break
 
-    if not obj_changed and not deleted and not created:
+    if not obj_changed and operation_type == ChangeObject.OperationType.UPDATE:
         return
 
     co = ChangeObject()
@@ -125,9 +128,7 @@ def create_version(obj, session, deleted=False, created=False):
     ## TODO: address worry that iterator over columns may mean we get pkids in
     ## different order ...
     co.object_id = get_object_id(obj)
-
-    ## TODO: set the OperationType properly
-    ## self.operation_type = self.OperationType.CREATE
+    co.operation_type = operation_type
     co.data = attr
     session.revision.manifest.append(co)
     return attr
@@ -159,7 +160,11 @@ class VersionedListener(SessionExtension):
         for obj in versioned_objects(session.dirty):
             create_version(obj, session)
         for obj in versioned_objects(session.deleted):
-            create_version(obj, session, deleted=True)
+            create_version(obj, session,
+                operation_type=ChangeObject.OperationType.DELETE
+                )
         for obj in versioned_objects(session.new):
-            create_version(obj, session, created=True)
+            create_version(obj, session,
+                operation_type=ChangeObject.OperationType.CREATE
+                )
 
