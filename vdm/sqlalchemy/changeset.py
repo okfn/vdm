@@ -66,7 +66,7 @@ def make_tables(metadata):
             Column('timestamp', DateTime, default=datetime.now),
             Column('metadata', JsonType),
             )
-    change_object_table = Table('changeset_object', metadata,
+    change_object_table = Table('change_object', metadata,
             Column('changeset_id', String(40), ForeignKey('changeset.id'),
                 primary_key=True),
             Column('object_id', JsonTypeTuple, primary_key=True),
