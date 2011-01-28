@@ -79,7 +79,6 @@ class Test_02_Versioning:
 
         logger.debug('***** Committing/Flushing Rev 1')
         session.commit()
-        print 'Rev 1 done'
         # can only get it after the flush
         self.rev1_id = rev1.id
         self.p2_objid = get_object_id(p2)
@@ -103,7 +102,6 @@ class Test_02_Versioning:
         session.add_all([outp1,outp2,t1])
         outp1.tags = [t1]
         Session.delete(outp2)
-        # session.flush()
         session.commit()
         # must do this after flush as timestamp not set until then
         self.ts2 = rev2.timestamp
@@ -144,8 +142,7 @@ class Test_02_Versioning:
         # should be at HEAD (i.e. rev2) by default 
         p1 = Session.query(Package).filter_by(name=self.name1).one()
         assert p1.license.open == False
-        # TODO: reinstate tags tests ...
-        # assert len(p1.tags) == 1
+        assert len(p1.tags) == 1
 
     def test_07_operation_type(self):
         p1 = Session.query(Package).filter_by(name=self.name1).one()
@@ -174,18 +171,6 @@ class Test_02_Versioning:
         assert co.data['name'] == self.name1
         assert co.data['title'] == self.title1, co.data
 
-#    def test_10_traversal_normal_fks_and_state_at_same_time(self):
-#        p2 = Session.query(Package).filter_by(name=self.name2).one()
-#        rev1 = Session.query(Revision).get(self.rev1_id)
-#        p2r1 = p2.get_as_of(rev1)
-#        assert p2r1.state == State.ACTIVE
-#
-#    def test_11_versioning_traversal_fks(self):
-#        p1 = Session.query(Package).filter_by(name=self.name1).one()
-#        rev1 = Session.query(Revision).get(self.rev1_id)
-#        p1r1 = p1.get_as_of(rev1)
-#        assert p1r1.license.open == True
-#
 #    def test_12_versioning_m2m_1(self):
 #        p1 = Session.query(Package).filter_by(name=self.name1).one()
 #        rev1 = Session.query(Revision).get(self.rev1_id)

@@ -126,14 +126,15 @@ mapper(Package, package_table, properties={
     # 
     # do we want lazy=False here? used in:
     # <http://www.sqlalchemy.org/trac/browser/sqlalchemy/trunk/examples/association/proxied_association.py>
-    'package_tags':relation(PackageTag, backref='package', cascade='all'), #, delete-orphan'),
+    # 'package_tags':relation(PackageTag, backref='package', cascade='all'), #, delete-orphan'),
+    'tags':relation(Tag, backref='packages', secondary=package_tag_table)
     })
 
 mapper(Tag, tag_table)
 
-mapper(PackageTag, package_tag_table, properties={
-    'tag':relation(Tag),
-    })
+#mapper(PackageTag, package_tag_table, properties={
+#    'tag':relation(Tag),
+#    })
 
 ## ------------------------
 ## Repository helper object
