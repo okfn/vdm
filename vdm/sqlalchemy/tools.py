@@ -37,7 +37,7 @@ from sqlalchemy.orm import class_mapper
 from sqlalchemy.orm import object_session
 from sqlalchemy import __version__ as sqla_version
 
-from .base import SQLAlchemySession
+from .sqla import SQLAlchemySession
 from .changeset import Changeset
 
 class Repository(object):
@@ -135,7 +135,7 @@ class Repository(object):
         
         @return: sqlalchemy query object.
         '''
-        return self.session.query(Changeset).filter_by(state=State.ACTIVE)
+        return self.session.query(Changeset)
 
     def list_changes(self, revision):
         '''List all objects changed by this `revision`.

@@ -1,6 +1,9 @@
 '''Generic sqlalchemy code (not specifically related to vdm).
 '''
+import uuid
 import sqlalchemy
+
+make_uuid = lambda: unicode(uuid.uuid4())
 
 class SQLAlchemyMixin(object):
     def __init__(self, **kw):
@@ -21,44 +24,55 @@ class SQLAlchemyMixin(object):
     def __repr__(self):
         return self.__str__()
 
-## --------------------------------------------------------
-## Table Helpers
 
-def copy_column(name, src_table, dest_table):
+class SQLAlchemySession(object):
+    '''Handle setting/getting attributes on the SQLAlchemy session.
+    
+    TODO: update all methods so they can take an object as well as session
+    object.
     '''
-    Note you cannot just copy columns standalone e.g.
 
-        col = table.c['xyz']
-        col.copy()
+    @classmethod
+    def setattr(self, session, attr, value):
+        setattr(session, attr, value)
+        # check if we are being given the Session class (threadlocal case)
+        # if so set on both class and instance
+        # this is important because sqlalchemy's object_session (used below) seems
+        # to return a Session() not Session
+        if isinstance(session, sqlalchemy.orm.scoping.ScopedSession):
+            sess = session()
+            setattr(sess, attr, value)
 
-    This will only copy basic info while more complex properties (such as fks,
-    constraints) to work must be set when the Column has a parent table.
+    @classmethod
+    def getattr(self, session, attr):
+        return getattr(session, attr)
 
-    TODO: stuff other than fks (e.g. constraints such as uniqueness)
-    '''
-    col = src_table.c[name]
-    if col.unique == True:
-        # don't copy across unique constraints, as different versions
-        # of an object may have identical column values
-        col.unique = False
-    dest_table.append_column(col.copy())
-    # only get it once we have a parent table
-    newcol = dest_table.c[name]
-    if len(col.foreign_keys) > 0:
-        for fk in col.foreign_keys: 
-            newcol.append_foreign_key(fk.copy())
+    # make explicit to avoid errors from typos (no attribute defns in python!)
+    @classmethod
+    def set_revision(self, session, revision):
+        self.setattr(session, 'HEAD', True)
+        self.setattr(session, 'revision', revision)
+        if revision.id is None:
+            # make uuid here so that if other objects in this session are flushed
+            # at the same time they know thier revision id
+            revision.id = make_uuid()
+            # there was a begin_nested here but that just caused flush anyway.
+            session.add(revision)
+            session.flush()
 
-def copy_table_columns(table):
-    columns = []
-    for col in table.c:
-        newcol = col.copy() 
-        if len(col.foreign_keys) > 0:
-            for fk in col.foreign_keys: 
-                newcol.foreign_keys.add(fk.copy())
-        columns.append(newcol)
-    return columns
+    @classmethod
+    def get_revision(self, session):
+        '''Get revision on current Session/session.
+        
+        NB: will return None if not set
+        '''
+        return getattr(session, 'revision', None)
 
-def copy_table(table, newtable):
-    for key in table.c.keys():
-        copy_column(key, table, newtable)
+    @classmethod
+    def set_not_at_HEAD(self, session):
+        self.setattr(session, 'HEAD', False)
+
+    @classmethod
+    def at_HEAD(self, session):
+        return getattr(session, 'HEAD', True)
 

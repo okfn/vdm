@@ -1,8 +1,9 @@
 # many of the tests are in demo_test as that sets up nice fixtures
-from tools import *
+from vdm.sqlalchemy.tools import *
 
 dburi = 'postgres://tester:pass@localhost/vdmtest'
-from demo import *
+from .demo import *
+
 class TestRepository:
     repo = Repository(metadata, Session, dburi)
 

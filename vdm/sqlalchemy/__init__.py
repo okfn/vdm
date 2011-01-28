@@ -26,9 +26,8 @@ TODO
 
 2. Support for composite primary keys.
 '''
-from .base import SQLAlchemySession
 from .tools import Repository
 from .changeset import Changeset, ChangeObject, setup_changeset
 from .model import VersionedListener
-from .sqla import SQLAlchemyMixin
+from .sqla import SQLAlchemyMixin, SQLAlchemySession
 
