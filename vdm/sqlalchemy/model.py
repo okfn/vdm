@@ -46,6 +46,8 @@ def set_revisioned_attributes(local_mapper):
     cls.__revisioned_attributes__ = [ col.key for col in cols ]
     return cols
 
+## TODO: address worry that iterator over columns may mean we get pkids in
+## different order ...
 def get_object_id(obj):
     obj_mapper = object_mapper(obj)
     object_id = [obj.__class__.__name__]
@@ -58,7 +60,6 @@ def get_object_id(obj):
     object_id = tuple(object_id)
     return object_id
 
-# Questions: when does this create the first version
 
 def create_version(obj, session,
         operation_type=ChangeObject.OperationType.UPDATE
@@ -110,21 +111,19 @@ def create_version(obj, session,
                 attr[col_key] = a[0]
                 obj_changed = True
 
-    if not obj_changed:
-        # not changed, but we have relationships.  OK
-        # check those too
-        # Why bother with this?
-        for prop in obj_mapper.iterate_properties:
-            if isinstance(prop, RelationshipProperty) and \
-                attributes.get_history(obj, prop.key).has_changes():
+    # not changed, but we have relationships.  OK
+    # check those too and include values into our attributes
+    for prop in obj_mapper.iterate_properties:
+        if isinstance(prop, RelationshipProperty):
+            a,u,d = attributes.get_history(obj, prop.key)
+            if d or a:
                 obj_changed = True
-                break
+            attr[prop.key] = [get_object_id(x) for x in getattr(obj, prop.key)
+                    or [] ]
 
     if not obj_changed and operation_type == ChangeObject.OperationType.UPDATE:
         return
 
-    ## TODO: address worry that iterator over columns may mean we get pkids in
-    ## different order ...
     object_id = get_object_id(obj)
 
     # HACK (sort of)
@@ -157,7 +156,7 @@ def create_version(obj, session,
 
 
 class VersionedListener(SessionExtension):
-    '''
+    '''Session extension that does versioning/revisioning.
 
     Notes
     =====
@@ -171,9 +170,6 @@ class VersionedListener(SessionExtension):
     Original sqlalchemy versioning code avoids this by *only* copying objects
     that are updated or deleted and hence object pks are set (i.e. it does not
     do anything for creation)
-
-    NB: cannot use before_commit either (works for update and delete but not
-    create ...)
 
     TODO: is there a danger here that things will not work if we are not using
     commit (and only flush).
@@ -191,6 +187,12 @@ class VersionedListener(SessionExtension):
                 operation_type=ChangeObject.OperationType.CREATE
                 )
 
+    # rather inefficient to do both but solves weird bug whereby if one does
+    # change object
+    # session.flush()
+    # change an object
+    # session.commit()
+    # we were failing to get changeobject updated
     def before_commit(self, session):
         for obj in versioned_objects(session.dirty):
             create_version(obj, session)
