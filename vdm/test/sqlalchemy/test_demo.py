@@ -67,11 +67,15 @@ class Test_02_Versioning:
         p2 = Package(name=self.name2, title=self.title1, license=lic1)
         session.add_all([lic1,lic2,p1,p2])
 
+        # Call session.flush here as this is, apparently, even more demanding
+        # What is weird is that this should work whether we call flush here or
+        # after p1.title = .. as we call commit below but that is not true!!
+        session.flush()
+
         # test vdm by flushing now and then making another change
         p1.title = self.title1
-        # What is weird is that this should work whether we call flush here or
-        # not since we call commit below but that is not true!!
-        session.flush()
+        # call before rather than after title set (see comment above)
+        # session.flush()
 
         logger.debug('***** Committing/Flushing Rev 1')
         session.commit()

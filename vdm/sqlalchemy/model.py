@@ -191,3 +191,15 @@ class VersionedListener(SessionExtension):
                 operation_type=ChangeObject.OperationType.CREATE
                 )
 
+    def before_commit(self, session):
+        for obj in versioned_objects(session.dirty):
+            create_version(obj, session)
+        for obj in versioned_objects(session.deleted):
+            create_version(obj, session,
+                operation_type=ChangeObject.OperationType.DELETE
+                )
+        for obj in versioned_objects(session.new):
+            create_version(obj, session,
+                operation_type=ChangeObject.OperationType.CREATE
+                )
+
