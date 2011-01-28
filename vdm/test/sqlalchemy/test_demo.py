@@ -63,12 +63,19 @@ class Test_02_Versioning:
         self.notes2 = u'Here\nare no\nnotes'
         lic1 = License(name='blah', open=True)
         lic2 = License(name='foo', open=True)
-        p1 = Package(name=self.name1, title=self.title1, license=lic1, notes=self.notes1)
+        p1 = Package(name=self.name1, license=lic1, notes=self.notes1)
         p2 = Package(name=self.name2, title=self.title1, license=lic1)
         session.add_all([lic1,lic2,p1,p2])
 
+        # test vdm by flushing now and then making another change
+        p1.title = self.title1
+        # What is weird is that this should work whether we call flush here or
+        # not since we call commit below but that is not true!!
+        session.flush()
+
         logger.debug('***** Committing/Flushing Rev 1')
         session.commit()
+        print 'Rev 1 done'
         # can only get it after the flush
         self.rev1_id = rev1.id
         self.p2_objid = get_object_id(p2)
@@ -118,6 +125,8 @@ class Test_02_Versioning:
     def test_03_basic(self):
         assert Session.query(License).count() == 2, Session.query(License).count()
         assert Session.query(Package).count() == 1, Session.query(Package).count()
+        pkg = Session.query(Package).first()
+        assert pkg.title == self.title2, pkg.title
 
     def test_04_all_revisions(self):
         p1 = Session.query(Package).filter_by(name=self.name1).one()
@@ -159,7 +168,7 @@ class Test_02_Versioning:
         changeobjects = all_revisions(p1)
         co = changeobjects[-1]
         assert co.data['name'] == self.name1
-        assert co.data['title'] == self.title1
+        assert co.data['title'] == self.title1, co.data
 
 #    def test_10_traversal_normal_fks_and_state_at_same_time(self):
 #        p2 = Session.query(Package).filter_by(name=self.name2).one()

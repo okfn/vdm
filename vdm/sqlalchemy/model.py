@@ -113,6 +113,7 @@ def create_version(obj, session,
     if not obj_changed:
         # not changed, but we have relationships.  OK
         # check those too
+        # Why bother with this?
         for prop in obj_mapper.iterate_properties:
             if isinstance(prop, RelationshipProperty) and \
                 attributes.get_history(obj, prop.key).has_changes():
@@ -122,15 +123,36 @@ def create_version(obj, session,
     if not obj_changed and operation_type == ChangeObject.OperationType.UPDATE:
         return
 
-    co = ChangeObject()
-    session.add(co)
-
     ## TODO: address worry that iterator over columns may mean we get pkids in
     ## different order ...
-    co.object_id = get_object_id(obj)
-    co.operation_type = operation_type
+    object_id = get_object_id(obj)
+
+    # HACK (sort of)
+    # Check whether we already have a ChangeObject for this Changeset/object_id
+    #
+    # Why?
+    # It is possibile that already have a ChangeObject in existence for this
+    # object_id and Changeset because already called flush / commit once for
+    # this object (made a change, flushed, then made another change -- note
+    # that autoflush can happen on e.g. queries)
+    # In that case we do not want to create a new ChangeObject, we want to edit
+    # the existing one (Why? If we dont we will get an error of form
+    # 'New instance ChangeObject .... conflicts with persisent instance')
+    co = None
+    for _co in session.revision.manifest:
+        if _co.object_id == object_id:
+            co = _co
+            break
+    if co is None:
+        co = ChangeObject()
+        session.revision.manifest.append(co)
+        co.object_id = object_id
+        # we do *not* want to override the operation type as we do not want a
+        # 'create' turning into an 'update' (once object is created in session,
+        # another changed will be seen as an update)
+        co.operation_type = operation_type
+
     co.data = attr
-    session.revision.manifest.append(co)
     return attr
 
 
@@ -150,12 +172,13 @@ class VersionedListener(SessionExtension):
     that are updated or deleted and hence object pks are set (i.e. it does not
     do anything for creation)
 
+    NB: cannot use before_commit either (works for update and delete but not
+    create ...)
+
     TODO: is there a danger here that things will not work if we are not using
     commit (and only flush).
     '''
-
-    # def before_commit(self, session):
-    # def before_flush(self, session, flush_context, instances):
+    
     def after_flush(self, session, flush_context):
         for obj in versioned_objects(session.dirty):
             create_version(obj, session)
