@@ -1,6 +1,11 @@
 HEAD
 ====
 
+v0.10 2011-10-26
+================
+  * Support for SQLAlchemy 0.7
+  * Fix timestamps to be UTC.
+
 v0.9 2010-01-11
 ===============
  
