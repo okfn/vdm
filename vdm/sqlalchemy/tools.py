@@ -2,6 +2,8 @@
 
 Primarily organized within a `Repository` object.
 '''
+from sqlalchemy import MetaData
+
 import logging
 logger = logging.getLogger('vdm')
 
@@ -80,7 +82,7 @@ class Repository(object):
     def clean_db(self):
         logger.info('Cleaning DB')
         self.metadata.drop_all(bind=self.metadata.bind)
-
+        
     def rebuild_db(self):
         logger.info('Rebuilding DB')
         self.clean_db()
@@ -195,7 +197,7 @@ class Repository(object):
                 self.session.delete(cont)
         if leave_record:
             import datetime
-            revision.message = u'PURGED: %s' % datetime.datetime.now()
+            revision.message = u'PURGED: %s UTC' % datetime.datetime.utcnow()
         else:
             self.session.delete(revision)
         self.commit_and_remove()

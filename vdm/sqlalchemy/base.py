@@ -80,7 +80,7 @@ class State(object):
 def make_revision_table(metadata):
     revision_table = Table('revision', metadata,
             Column('id', UnicodeText, primary_key=True, default=make_uuid),
-            Column('timestamp', DateTime, default=datetime.now),
+            Column('timestamp', DateTime, default=datetime.utcnow),
             Column('author', String(200)),
             Column('message', UnicodeText),
             Column('state', UnicodeText, default=State.ACTIVE)
