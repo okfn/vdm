@@ -5,7 +5,7 @@ import logging
 import weakref
 
 from sqlalchemy import *
-from sqlalchemy.orm.attributes import get_history
+from sqlalchemy.orm.attributes import get_history, PASSIVE_OFF
 from sqlalchemy import __version__ as sqav
 
 from sqla import SQLAlchemyMixin
@@ -550,7 +550,7 @@ class Revisioner(MapperExtension):
         for key in instance.revisioned_fields():
             (added, unchanged, deleted) = get_history(state,
                                                       key,
-                                                      passive = False)
+                                                      passive = PASSIVE_OFF)
             if added or deleted:
                 logger.debug('check_real_change: True')
                 return True

@@ -20,7 +20,7 @@ if sqav[:3] in ("0.4", "0.5"):
                            " CASCADE")
                self.execute()
      postgres.dialect.schemadropper = CascadeSchemaDropper
-elif sqav.startswith("0.6"):
+elif sqav.startswith("0.6") or sqav.startswith("0.7"):
      from sqlalchemy.dialects.postgresql import base
      def visit_drop_table(self, drop):
           return "\nDROP TABLE " + \

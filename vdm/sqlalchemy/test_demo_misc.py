@@ -9,7 +9,7 @@ class TestMisc:
         repo.rebuild_db()
 
     def test_column_create(self):
-        if sqav.startswith("0.6"):
+        if sqav.startswith("0.6") or sqav.startswith("0.7"):
             ## FIXME???
             ## This test does not appear to test anything that is
             ## VDM specific. It also fails with SQLAlchemy 0.6
@@ -76,8 +76,8 @@ class TestMisc:
         assert outcol.key == incol.key
         assert len(incol.foreign_keys) == 1
         assert len(outcol.foreign_keys) == 1
-        infk = incol.foreign_keys[0]
-        outfk = outcol.foreign_keys[0]
+        infk = list(incol.foreign_keys)[0]
+        outfk = list(outcol.foreign_keys)[0]
         assert infk.parent is not None
         assert outfk.parent is not None
 
@@ -96,8 +96,8 @@ class TestMisc:
         assert outcol.key == incol.key
         assert len(incol.foreign_keys) == 1
         assert len(outcol.foreign_keys) == 1
-        infk = incol.foreign_keys[0]
-        outfk = outcol.foreign_keys[0]
+        infk = list(incol.foreign_keys)[0]
+        outfk = list(outcol.foreign_keys)[0]
         assert infk.parent is not None
         assert outfk.parent is not None
 

@@ -448,6 +448,7 @@ import weakref
 # collection 
 class OurAssociationProxy(sqlalchemy.ext.associationproxy.AssociationProxy):
 
+    scalar = False
     def _target_is_scalar(self):
         return False
 

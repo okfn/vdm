@@ -16,7 +16,7 @@ import vdm.sqlalchemy
 TEST_ENGINE = "postgres"  # or "sqlite"
 
 if TEST_ENGINE == "postgres":
-    engine = create_engine('postgres://tester:pass@localhost/vdmtest',
+    engine = create_engine('postgres://david:ytrewq@localhost/vdmtest',
                            pool_threadlocal=True)
 else:
     # setting the isolation_level is a hack required for sqlite support
