@@ -1,0 +1,10 @@
+labs_project({
+    "image" : "http://farm7.static.flickr.com/6042/6323055654_4b1df3960d_t.jpg",
+    "category" : "Tools and Infrastructure",
+    "name" : "Versioned Domain Model (vdm)",
+    "status" : "Active",
+    "strapline" : "Versioned Domain Model (vdm) is a package which allows you to 'version' your domain model in the same way that source code version control systems such as subversion allow you version your code.",
+    "description" : "",
+    "link" : "http://okfn.org/projects/vdm/",
+    "imagename" : "vdm"
+});
