@@ -30,7 +30,7 @@ elif sqav.startswith("0.6") or sqav.startswith("0.7"):
                  " CASCADE"
      base.dialect.ddl_compiler.visit_drop_table = visit_drop_table
 else:
-     raise ValueError("VDM only works with SQLAlchemy versions 0.4 through 0.6")
+     raise ValueError("VDM only works with SQLAlchemy versions 0.4 through 0.7, not: %s" % sqav)
 
 
 from sqlalchemy import create_engine
