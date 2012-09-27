@@ -423,9 +423,10 @@ def create_object_version(mapper_fn, base_object, rev_table):
                 # TODO: actually deal with this
                 # raise a warning of some kind
                 msg = 'Skipping adding property %s to revisioned object' % prop
-                # Issue #3 not considered for over a year, so changing logging level to info.
+                # Issue #3 not considered for over two years, so removing this
+                # annoying log message.
                 # This doesn\'t seem to be a problem for ckan.
-                logger.info(msg)
+                #logger.info(msg)
 
     return MyClass
 
