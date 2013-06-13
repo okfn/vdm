@@ -114,11 +114,11 @@ General Conceptual Documentation
 
 A great starting point is Fowler's *Patterns for things that change with time*:
 
-  http://www.martinfowler.com/ap2/timeNarrative.html
+  http://martinfowler.com/eaaDev/timeNarrative.html
 
 In particular Temporal Object:
 
-  http://www.martinfowler.com/ap2/temporalObject.html
+  http://martinfowler.com/eaaDev/TemporalObject.html
 
 Two possible approaches:
 
