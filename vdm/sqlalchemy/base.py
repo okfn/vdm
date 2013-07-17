@@ -181,7 +181,7 @@ class StatefulObjectMixin(object):
     __stateful__ = True
 
     def delete(self):
-        logger.debug('Running delete on %s' % self)
+        logger.debug('Running delete on %s', self)
         self.state = State.DELETED
     
     def undelete(self):
@@ -219,7 +219,7 @@ class RevisionedObjectMixin(object):
             #     msg = 'The revision on the session does not match the one you' + \
             #     'requesting.'
             #     raise Exception(msg)
-            logger.debug('get_as_of: setting revision and not_as_HEAD: %s' %
+            logger.debug('get_as_of: setting revision and not_as_HEAD: %s',
                     revision)
             SQLAlchemySession.set_revision(sess, revision)
             SQLAlchemySession.set_not_at_HEAD(sess)
@@ -536,7 +536,7 @@ class Revisioner(MapperExtension):
         # database which requires we use *column* values. In particular, we
         # need revision_id not revision object to create revision_object
         # properly!
-        logger.debug('Revisioner.set_revision: revision is %s' % current_rev)
+        logger.debug('Revisioner.set_revision: revision is %s', current_rev)
         assert current_rev.id, 'Must have a revision.id to create object revision'
         instance.revision = current_rev
         # must set both since we are already in flush so setting object will
@@ -545,7 +545,7 @@ class Revisioner(MapperExtension):
 
     def check_real_change(self, instance, mapper, connection):
         # check each attribute to see if they have been changed
-        logger.debug('check_real_change: %s' % instance)
+        logger.debug('check_real_change: %s', instance)
         if sqav.startswith("0.4"):
             state = instance._state
         else:
@@ -586,10 +586,10 @@ class Revisioner(MapperExtension):
         revision_already = num_revisions > 0
 
         if revision_already:
-            logger.debug('Updating version of %s: %s' % (instance, colvalues))
+            logger.debug('Updating version of %s: %s', instance, colvalues)
             connection.execute(self.revision_table.update(existing_revision_clause).values(colvalues))
         else:
-            logger.debug('Creating version of %s: %s' % (instance, colvalues))
+            logger.debug('Creating version of %s: %s', instance, colvalues)
             ins = self.revision_table.insert().values(colvalues)
             connection.execute(ins)
 
@@ -602,7 +602,7 @@ class Revisioner(MapperExtension):
     def before_update(self, mapper, connection, instance):
         self._is_changed[instance] = self.check_real_change(instance, mapper, connection)
         if not self.revisioning_disabled(instance) and self._is_changed[instance]:
-            logger.debug('before_update: %s' % instance)
+            logger.debug('before_update: %s', instance)
             self.set_revision(instance)
             self._is_changed[instance] = self.check_real_change(
                 instance, mapper, connection)
@@ -614,19 +614,19 @@ class Revisioner(MapperExtension):
     def before_insert(self, mapper, connection, instance):
         self._is_changed[instance] = self.check_real_change(instance, mapper, connection)
         if not self.revisioning_disabled(instance) and self._is_changed[instance]:
-            logger.debug('before_insert: %s' % instance)
+            logger.debug('before_insert: %s', instance)
             self.set_revision(instance)
         return EXT_CONTINUE
 
     def after_update(self, mapper, connection, instance):
         if not self.revisioning_disabled(instance) and self._is_changed[instance]:
-            logger.debug('after_update: %s' % instance)
+            logger.debug('after_update: %s', instance)
             self.make_revision(instance, mapper, connection)
         return EXT_CONTINUE
 
     def after_insert(self, mapper, connection, instance):
         if not self.revisioning_disabled(instance) and self._is_changed[instance]:
-            logger.debug('after_insert: %s' % instance)
+            logger.debug('after_insert: %s', instance)
             self.make_revision(instance, mapper, connection)
         return EXT_CONTINUE
 
