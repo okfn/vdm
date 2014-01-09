@@ -22,7 +22,7 @@ if sqav[:3] in ("0.4", "0.5"):
                            " CASCADE")
                self.execute()
      postgres.dialect.schemadropper = CascadeSchemaDropper
-elif sqav.startswith("0.6") or sqav.startswith("0.7"):
+elif sqav.startswith("0.6") or sqav.startswith("0.7") or sqav.startswith("0.8"):
      from sqlalchemy.dialects.postgresql import base
      def visit_drop_table(self, drop):
           return "\nDROP TABLE " + \
@@ -34,7 +34,11 @@ else:
 
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import ScopedSession
+try:
+    from sqlalchemy.orm import ScopedSession as scoped_session
+except ImportError:
+    from sqlalchemy.orm import scoped_session
+
 from sqlalchemy.orm import class_mapper
 from sqlalchemy.orm import object_session
 from sqlalchemy import __version__ as sqla_version
@@ -60,7 +64,7 @@ class Repository(object):
         self.session = our_session
         self.versioned_objects = versioned_objects
         self.dburi = dburi
-        self.have_scoped_session = isinstance(self.session, ScopedSession)
+        self.have_scoped_session = isinstance(self.session, scoped_session)
         self.transactional = False 
         if self.have_scoped_session:
             tmpsess = self.session()
