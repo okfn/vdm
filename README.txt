@@ -2,9 +2,9 @@ To install do::
 
     $ easy_install vdm
 
-Or checkout from our mercurial repository::
+Or checkout from our git repository::
 
-    $ hg clone http://knowledgeforge.net/okfn/vdm
+    $ git clone https://github.com/okfn/vdm
 
 For more information see the main package docstring. To view this either just
 open vdm/__init__.py or do (after installation)::

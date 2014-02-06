@@ -18,7 +18,7 @@ setup(
     license = "MIT",
     keywords = "versioning sqlobject sqlalchemy orm",
     url = "http://www.okfn.org/vdm/", 
-    download_url = "http://knowledgeforge.net/okfn/vdm",
+    download_url = "https://github.com/okfn/vdm",
     zip_safe = False,
     classifiers = [
         'Development Status :: 4 - Beta',
