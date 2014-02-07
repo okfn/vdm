@@ -8,7 +8,7 @@ versions a complete model and not just individual domain objects (for more on
 this distinction see below).
 
 At present the package is provided as an extension to SQLAlchemy (tested
-against v0.4-v0.6).
+against v0.4-v0.8).
 
 The library is pretty stable and has been used by the authors in production
 systems since v0.2 (May 2008).
