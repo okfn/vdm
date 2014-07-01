@@ -405,7 +405,12 @@ def create_object_version(mapper_fn, base_object, rev_table):
     # If related object is revisioned then can do all of these
     # If not revisioned can only support simple relation (first case -- why?)
     for prop in base_mapper.iterate_properties:
-        is_relation = prop.__class__ == sqlalchemy.orm.properties.PropertyLoader
+        try:
+            is_relation = prop.__class__ == sqlalchemy.orm.properties.PropertyLoader
+        except AttributeError:
+            # SQLAlchemy 0.9
+            is_relation = prop.__class__ == sqlalchemy.orm.properties.RelationshipProperty
+
         if is_relation:
             # in sqlachemy 0.4.2
             # prop_remote_obj = prop.select_mapper.class_
