@@ -9,7 +9,8 @@ class TestMisc:
         repo.rebuild_db()
 
     def test_column_create(self):
-        if sqav.startswith("0.6") or sqav.startswith("0.7"):
+
+        if sqav[:3] in ("0.6", "0.7", "0.8", "0.9"):
             ## FIXME???
             ## This test does not appear to test anything that is
             ## VDM specific. It also fails with SQLAlchemy 0.6
