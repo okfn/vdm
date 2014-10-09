@@ -1,6 +1,14 @@
 HEAD
 ====
 
+v0.13 2014-08-12
+================
+  * Support for SQLAlchemy 0.9
+
+v0.12 2014-01-20
+================
+  * Support for SQLAlchemy 0.8
+
 v0.10 2011-10-26
 ================
   * Support for SQLAlchemy 0.7
