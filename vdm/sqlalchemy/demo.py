@@ -16,7 +16,7 @@ import vdm.sqlalchemy
 TEST_ENGINE = "postgres"  # or "sqlite"
 
 if TEST_ENGINE == "postgres":
-    engine = create_engine('postgres://david:ytrewq@localhost/vdmtest',
+    engine = create_engine('postgres://ckan_default:pass@localhost/vdmtest',
                            pool_threadlocal=True)
 else:
     # setting the isolation_level is a hack required for sqlite support
@@ -77,7 +77,7 @@ package_tag_revision_table = vdm.sqlalchemy.make_revisioned_table(package_tag_ta
 ## -------------------
 ## Mapped classes
 
-        
+
 class License(vdm.sqlalchemy.RevisionedObjectMixin,
     vdm.sqlalchemy.StatefulObjectMixin,
     vdm.sqlalchemy.SQLAlchemyMixin
@@ -150,7 +150,7 @@ mapper(Package, package_table, properties={
     # second commit happens in which the package_id is correctly set.
     # However after first commit PackageTag does not have Package and
     # delete-orphan kicks in to remove it!
-    # 
+    #
     # do we want lazy=False here? used in:
     # <http://www.sqlalchemy.org/trac/browser/sqlalchemy/trunk/examples/association/proxied_association.py>
     'package_tags':relation(PackageTag, backref='package', cascade='all'), #, delete-orphan'),
@@ -176,7 +176,7 @@ LicenseRevision = vdm.sqlalchemy.create_object_version(mapper, License,
 PackageTagRevision = vdm.sqlalchemy.create_object_version(mapper, PackageTag,
         package_tag_revision_table)
 
-from base import add_stateful_versioned_m2m 
+from base import add_stateful_versioned_m2m
 vdm.sqlalchemy.add_stateful_versioned_m2m(Package, PackageTag, 'tags', 'tag',
         'package_tags')
 vdm.sqlalchemy.add_stateful_versioned_m2m_on_version(PackageRevision, 'tags')
