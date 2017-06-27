@@ -1,3 +1,6 @@
+.. image:: https://travis-ci.org/okfn/vdm.svg?branch=master
+    :target: https://travis-ci.org/okfn/vdm
+
 To install do::
 
     $ easy_install vdm
