@@ -57,13 +57,13 @@ To give a flavour of all of this here is a pseudo-code example::
     # We need a session of some kind to track which objects have been changed
     # In SQLAlchemy can use its Session object
     session = get_session_in_some_way()
-    
+
     # Our Revision object
     rev1 = Revision(author='me')
     # Associate revision with session
     # Any given session will have a single associated revision
     session.revision = rev1
-    
+
     # Book and Author are domain objects which has been made versioned using this library
     # Note the typo!
     b1 = Book(name='warandpeace', title='War and Peacee')
@@ -93,7 +93,7 @@ To give a flavour of all of this here is a pseudo-code example::
 
     # some time even later
     rev1 = Revision.get(timestamp=timestamp1)
-    b1 = Book.get(name='warandpeace') 
+    b1 = Book.get(name='warandpeace')
     b1 = b1.get_as_of(rev1)
     assert b1.title == 'War and Peacee'
     assert b1.authors == []
@@ -179,7 +179,7 @@ given Revision.
 
      This can be resolved in the following ways:
 
-     1. Locking 
+     1. Locking
      2. Merging
 
      Rather than summarize all situations just see Fowler on concurrency
@@ -191,5 +191,5 @@ given Revision.
   3. This change is notified to a moderator
   4. A moderator either allows or disallows the change
 '''
-__version__ = '0.13'
+__version__ = '0.14'
 __description__ = 'A versioned domain model framework.'
