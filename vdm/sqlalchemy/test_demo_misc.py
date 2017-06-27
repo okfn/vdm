@@ -8,59 +8,6 @@ class TestMisc:
     def teardown_class(self):
         repo.rebuild_db()
 
-    def test_column_create(self):
-
-        if sqav[:3] in ("0.6", "0.7", "0.8", "0.9"):
-            ## FIXME???
-            ## This test does not appear to test anything that is
-            ## VDM specific. It also fails with SQLAlchemy 0.6
-            ## Does this test really belong here?
-            return
-        
-        tabxyz = Table('xyz', metadata,
-            Column('id', Integer, primary_key=True)
-            )
-        col = Column('abc', Integer, ForeignKey('xyz.id'))
-        # FK does *not* work
-        assert len(col.foreign_keys) == 0
-        tab = Table('tab', metadata,
-            Column('abc', Integer, ForeignKey('xyz.id')),
-            )
-        col0 = tab.c['abc']
-        fk0 = col0.foreign_keys[0]
-        assert len(col0.foreign_keys) == 1
-        assert fk0.parent is not None
-
-        tab2 = Table('tab', metadata)
-        tab2.append_column(
-            Column('abc', Integer, ForeignKey('xyz.id'))
-            )
-        assert len(tab2.c['abc'].foreign_keys) == 1
-        assert tab2.c['abc'].foreign_keys[0].parent is not None
-
-        tab3 = Table('tab', metadata)
-        col3 = col0.copy()
-        col3.foreign_keys.add(tab.c['abc'].foreign_keys[0].copy())
-        tab3.append_column(col3)
-        assert len(tab3.c['abc'].foreign_keys) == 1
-        # fails
-        # assert tab3.c['abc'].foreign_keys[0].parent
-
-        tab3 = Table('tab', metadata)
-        col3 = col0.copy()
-        tab3.append_column(col3)
-        col3.foreign_keys.add(ForeignKey(col0.key)) 
-        assert len(tab3.c['abc'].foreign_keys) == 1
-        # fails
-        # assert tab3.c['abc'].foreign_keys[0].parent
-        tab4 = Table('tab', metadata)
-        tab4.append_column(
-            col0.copy()
-            )
-        tab4.c[col0.key].append_foreign_key(fk0.copy())
-        assert len(tab4.c['abc'].foreign_keys) == 1
-        assert tab4.c['abc'].foreign_keys[0].parent is not None
-
     def test_copy_column(self):
         t1 = package_table
         newtable = Table('mytable', metadata)

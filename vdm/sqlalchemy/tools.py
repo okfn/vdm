@@ -23,7 +23,7 @@ if sqav[:3] in ("0.4", "0.5"):
                self.execute()
      postgres.dialect.schemadropper = CascadeSchemaDropper
 
-elif sqav[:3] in ("0.6", "0.7", "0.8", "0.9"):
+elif sqav[:3] in ("0.6", "0.7", "0.8", "0.9", "1.0", "1.1"):
      from sqlalchemy.dialects.postgresql import base
      def visit_drop_table(self, drop):
           return "\nDROP TABLE " + \
@@ -66,28 +66,28 @@ class Repository(object):
         self.versioned_objects = versioned_objects
         self.dburi = dburi
         self.have_scoped_session = isinstance(self.session, scoped_session)
-        self.transactional = False 
+        self.transactional = False
         if self.have_scoped_session:
             tmpsess = self.session()
         else:
             tmpsess = self.session
         if sqla_version > '0.4.99':
             self.transactional = not tmpsess.autocommit
-        else:    
+        else:
             self.transactional = tmpsess.transactional
         if self.dburi:
             engine = create_engine(dburi, pool_threadlocal=True)
-            self.metadata.bind = engine 
+            self.metadata.bind = engine
             self.session.bind = engine
 
     def create_db(self):
         logger.info('Creating DB')
-        self.metadata.create_all(bind=self.metadata.bind)    
+        self.metadata.create_all(bind=self.metadata.bind)
 
     def clean_db(self):
         logger.info('Cleaning DB')
         self.metadata.drop_all(bind=self.metadata.bind)
-        
+
     def rebuild_db(self):
         logger.info('Rebuilding DB')
         self.clean_db()
@@ -96,7 +96,7 @@ class Repository(object):
 
     def init_db(self):
         self.create_db()
-        logger.info('Initing DB') 
+        logger.info('Initing DB')
         self.session.remove()
 
     def commit(self):
@@ -112,14 +112,14 @@ class Repository(object):
                 raise
         else:
             self.session.flush()
-    
+
     def commit_and_remove(self):
         self.commit()
         self.session.remove()
-    
-    def new_revision(self):                                   
+
+    def new_revision(self):
         '''Convenience method to create new revision and set it on session.
-        
+
         NB: if in transactional mode do *not* need to call `begin` as we are
         automatically within a transaction at all times if session was set up
         as transactional (every commit is paired with a begin)
@@ -127,7 +127,7 @@ class Repository(object):
         '''
         rev = Revision()
         self.session.add(rev)
-        SQLAlchemySession.set_revision(self.session, rev)             
+        SQLAlchemySession.set_revision(self.session, rev)
         return rev
 
     def youngest_revision(self):
@@ -135,10 +135,10 @@ class Repository(object):
         q = self.history()
         q = q.order_by(Revision.timestamp.desc())
         return q.first()
-        
+
     def history(self):
         '''Return a history of the repository as a query giving all active revisions.
-        
+
         @return: sqlalchemy query object.
         '''
         return self.session.query(Revision).filter_by(state=State.ACTIVE)
@@ -209,7 +209,7 @@ class Repository(object):
 
     def revert(self, continuity, new_correct_revobj):
         '''Revert continuity object back to a particular revision_object.
-        
+
         NB: does *not* call flush/commit.
         '''
         logger.debug('revert: %s' % continuity)
