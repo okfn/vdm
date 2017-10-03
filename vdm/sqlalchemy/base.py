@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from datetime import datetime
 import difflib
 import uuid
@@ -8,8 +9,8 @@ from sqlalchemy import *
 from sqlalchemy.orm.attributes import get_history, PASSIVE_OFF
 from sqlalchemy import __version__ as sqav
 
-from sqla import SQLAlchemyMixin
-from sqla import copy_column, copy_table_columns, copy_table
+from .sqla import SQLAlchemyMixin
+from .sqla import copy_column, copy_table_columns, copy_table
 
 make_uuid = lambda: unicode(uuid.uuid4())
 logger = logging.getLogger('vdm')
