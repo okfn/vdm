@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import logging
 # logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(level=logging.INFO)
@@ -6,7 +7,7 @@ logger = logging.getLogger('vdm')
 from sqlalchemy.orm import object_session, class_mapper
 
 import vdm.sqlalchemy
-from demo import *
+from .demo import *
 
 from sqlalchemy import __version__ as sqav
 if sqav.startswith("0.4"):
