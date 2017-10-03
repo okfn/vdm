@@ -3,6 +3,7 @@
 This module sets up a small domain model with some versioned objects. Code
 that then uses these objects can be found in demo_test.py.
 '''
+from __future__ import absolute_import
 from datetime import datetime
 import logging
 logger = logging.getLogger('vdm')
@@ -176,7 +177,7 @@ LicenseRevision = vdm.sqlalchemy.create_object_version(mapper, License,
 PackageTagRevision = vdm.sqlalchemy.create_object_version(mapper, PackageTag,
         package_tag_revision_table)
 
-from base import add_stateful_versioned_m2m
+from .base import add_stateful_versioned_m2m
 vdm.sqlalchemy.add_stateful_versioned_m2m(Package, PackageTag, 'tags', 'tag',
         'package_tags')
 vdm.sqlalchemy.add_stateful_versioned_m2m_on_version(PackageRevision, 'tags')
@@ -184,8 +185,7 @@ vdm.sqlalchemy.add_stateful_versioned_m2m_on_version(PackageRevision, 'tags')
 ## ------------------------
 ## Repository helper object
 
-from tools import Repository
+from .tools import Repository
 repo = Repository(metadata, Session,
         versioned_objects = [ Package, License,  PackageTag ]
         )
-

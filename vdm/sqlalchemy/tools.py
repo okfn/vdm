@@ -44,7 +44,7 @@ from sqlalchemy.orm import class_mapper
 from sqlalchemy.orm import object_session
 from sqlalchemy import __version__ as sqla_version
 
-from base import SQLAlchemySession, State, Revision
+from .base import SQLAlchemySession, State, Revision
 
 class Repository(object):
     '''Manage repository-wide type changes for versioned domain models.

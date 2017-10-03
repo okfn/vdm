@@ -28,8 +28,9 @@ TODO
 
 4. Support for m2m collections other than lists.
 '''
-from base import *
-from tools import Repository
+from __future__ import absolute_import
+from .base import *
+from .tools import Repository
 
 __all__ = [
         'set_revision', 'get_revision',
