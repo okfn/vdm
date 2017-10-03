@@ -71,12 +71,12 @@ class TestMisc:
         assert len(rev.c['revision_id'].foreign_keys) == 1
         assert rev.c['revision_id'].primary_key
         assert rev.c['id'].primary_key
-        print rev.primary_key.columns
+        print(rev.primary_key.columns)
         assert len(rev.primary_key.columns) == 2
 
     def test_accessing_columns_on_object(self):
         table = class_mapper(Package).mapped_table
-        print table.c.keys()
+        print(table.c.keys())
         assert len(table.c.keys()) > 0
         assert 'revision_id' in table.c.keys()
 
