@@ -134,8 +134,8 @@ class Test_02_Versioning:
         p1 = Session.query(Package).filter_by(name=self.name1).one()
         pr1 = Session.query(PackageRevision).filter_by(name=self.name1).first()
         table = class_mapper(PackageRevision).mapped_table
-        print table.c.keys()
-        print pr1.continuity_id
+        print(table.c.keys())
+        print(pr1.continuity_id)
         assert pr1.continuity == p1
 
     def test_basic_state(self):
@@ -288,8 +288,8 @@ class Test_03_StatefulVersioned:
         rev2 = Session.query(Revision).get(self.rev2_id)
         # should be 2 deleted and 1 as None
         ptrevs = [ pt.get_as_of(rev2) for pt in p1.package_tags ]
-        print ptrevs
-        print Session.query(PackageTagRevision).all()
+        print(ptrevs)
+        print(Session.query(PackageTagRevision).all())
         assert ptrevs[0].revision_id == rev2.id
 
     def test_3_remove_and_readd_m2m_2(self):
@@ -308,8 +308,8 @@ class Test_03_StatefulVersioned:
         p2rev = p1.get_as_of(rev2)
         assert p2rev.__class__ == PackageRevision
         assert len(p2rev.package_tags) == num_package_tags
-        print rev2.id
-        print p2rev.tags_active
+        print(rev2.id)
+        print(p2rev.tags_active)
         assert len(p2rev.tags) == 0
 
 
@@ -366,7 +366,7 @@ class Test_04_StatefulVersioned2:
         newp1 = Session.query(Package).filter_by(name=self.name1).one()
         t1 = Session.query(Tag).filter_by(name='geo').one()
         t2 = Tag(name='geo2')
-        print '**** setting tags'
+        print('**** setting tags')
         newp1.tags[:] = [ t1, t2 ]
         repo.commit_and_remove()
 
