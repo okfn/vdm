@@ -1,7 +1,8 @@
+from __future__ import absolute_import
 from sqlalchemy import *
 from sqlalchemy.orm import *
 
-from stateful import *
+from .stateful import *
 
 engine = create_engine('sqlite:///:memory:', echo=True)
 
