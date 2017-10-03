@@ -8,8 +8,8 @@ matrix:
 install:
     - pip install flake8
     - pip install nose
-    - pip install sqlalchemy==1.1
-    - pip install psycopg2==2.4.5
+    - pip install sqlalchemy==1.1.14
+    - pip install psycopg2==2.7.3.1
     - python setup.py develop
     - sudo -u postgres psql -c "CREATE USER ckan_default WITH PASSWORD 'pass';"
     - sudo -u postgres psql -c 'CREATE DATABASE vdmtest WITH OWNER ckan_default;'	
