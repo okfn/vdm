@@ -1,8 +1,9 @@
+from __future__ import absolute_import
 # many of the tests are in demo_test as that sets up nice fixtures
-from tools import *
+from .tools import *
 
 dburi = 'postgres://tester:pass@localhost/vdmtest'
-from demo import *
+from .demo import *
 class TestRepository:
     repo = Repository(metadata, Session, dburi)
 
@@ -31,4 +32,3 @@ class TestRepository:
         history = self.repo.history()
         revs = history.all()
         assert len(revs) == 1
-
