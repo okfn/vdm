@@ -65,7 +65,10 @@ TODO: move stateful material from base.py here?
 import logging
 logger = logging.getLogger('vdm.stateful')
 
-import itertools
+try:      # define filter() for Python 2
+    from itertools import ifilter as filter
+except ImportError:
+    pass  # filter() is a builtin in Python 3
 
 
 class StatefulProxy(object):
@@ -286,14 +289,14 @@ class StatefulList(StatefulProxy):
 
     def __iter__(self):
         mytest = lambda x: self._is_active(x)
-        myiter = itertools.ifilter(mytest, iter(self.target))
+        myiter = filter(mytest, iter(self.target))
         return myiter
     
     def __len__(self):
         return sum([1 for _ in self])
 
     def count(self, item):
-        myiter = itertools.ifilter(lambda v: v == item, iter(self))
+        myiter = filter(lambda v: v == item, iter(self))
         counter = [1 for _ in myiter]
         return sum(counter)
 
@@ -355,7 +358,7 @@ class StatefulDict(StatefulProxy):
             raise KeyError(k)
 
     def __iter__(self):
-        myiter = itertools.ifilter(lambda x: self._is_active(self.target[x]),
+        myiter = filter(lambda x: self._is_active(self.target[x]),
                 iter(self.target))
         return myiter
 
