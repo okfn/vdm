@@ -1,7 +1,8 @@
+from __future__ import absolute_import
 from sqlalchemy.orm import object_session
 from sqlalchemy import __version__ as sqav
-from demo import *
-from base import *
+from .demo import *
+from .base import *
 
 class TestMisc:
     @classmethod
