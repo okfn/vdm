@@ -168,8 +168,8 @@ htmlhelp_basename = 'VersionedDomainModeldoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, document class [howto/manual]).
 latex_documents = [
-  ('index', 'VersionedDomainModel.tex', ur'Versioned Domain Model Documentation',
-   ur'Rufus Pollock (Open Knowledge Foundation)', 'manual'),
+  ('index', 'VersionedDomainModel.tex', u'Versioned Domain Model Documentation',
+   u'Rufus Pollock (Open Knowledge Foundation)', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
