@@ -8,9 +8,16 @@ import weakref
 from sqlalchemy import *
 from sqlalchemy.orm.attributes import get_history, PASSIVE_OFF
 from sqlalchemy import __version__ as sqav
+import sqlalchemy.orm.properties
+from sqlalchemy.orm import class_mapper
+from sqlalchemy.orm import relation, backref
+from sqlalchemy.orm import MapperExtension
+from sqlalchemy.orm import object_session
+from sqlalchemy.orm import EXT_CONTINUE
 
 from .sqla import SQLAlchemyMixin
 from .sqla import copy_column, copy_table_columns, copy_table
+from .stateful import add_stateful_m2m
 
 make_uuid = lambda: unicode(uuid.uuid4())
 logger = logging.getLogger('vdm')
@@ -346,13 +353,9 @@ class RevisionedObjectMixin(object):
             return None
 
 
-
 ## --------------------------------------------------------
 ## Mapper Helpers
 
-import sqlalchemy.orm.properties
-from sqlalchemy.orm import class_mapper
-from sqlalchemy.orm import relation, backref
 
 def modify_base_object_mapper(base_object, revision_obj, state_obj):
     base_mapper = class_mapper(base_object)
@@ -458,7 +461,6 @@ def add_fake_relation(revision_class, name, is_many=False):
     x = property(_pget)
     setattr(revision_class, name, x)
 
-from stateful import add_stateful_m2m
 def add_stateful_versioned_m2m(*args, **kwargs):
     '''Add a Stateful versioned m2m attributes to a domain object.
     
@@ -479,10 +481,6 @@ def add_stateful_versioned_m2m_on_version(revision_class, m2m_property_name):
         add_fake_relation(revision_class, propname,
                 is_many=True)
 
-
-from sqlalchemy.orm import MapperExtension
-from sqlalchemy.orm import object_session
-from sqlalchemy.orm import EXT_CONTINUE
 
 class Revisioner(MapperExtension):
     '''SQLAlchemy MapperExtension which implements revisioning of sqlalchemy
