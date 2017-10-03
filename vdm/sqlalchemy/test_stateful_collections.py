@@ -96,7 +96,7 @@ class PackageLicense(object):
 add_stateful_m2m(Package, PackageLicense,  'licenses', 'license',
         'package_licenses', is_active=is_active, delete=delete,
         undelete=undelete)
-from base import add_stateful_versioned_m2m
+from .base import add_stateful_versioned_m2m
 add_stateful_versioned_m2m(Package, PackageLicense,  'licenses3', 'license',
         'package_licenses', is_active=is_active, delete=delete,
         undelete=undelete)
@@ -245,4 +245,3 @@ class TestSimple:
     def test_2(self):
         p1 = session.query(Package).get('pkg3')
         assert p1.package_licenses[0].package == p1
-
