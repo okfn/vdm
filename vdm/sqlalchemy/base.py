@@ -19,6 +19,12 @@ from .sqla import SQLAlchemyMixin
 from .sqla import copy_column, copy_table_columns, copy_table
 from .stateful import add_stateful_m2m
 
+
+try:
+    unicode        # Python 2
+except NameError:
+    unicode = str  # Python 3
+
 make_uuid = lambda: unicode(uuid.uuid4())
 logger = logging.getLogger('vdm')
 
@@ -638,4 +644,3 @@ class Revisioner(MapperExtension):
              **flags):
         # TODO: 2009-02-13 why is this needed? Can we remove this?
         return EXT_CONTINUE
-
