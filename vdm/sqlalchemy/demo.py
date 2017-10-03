@@ -185,8 +185,7 @@ vdm.sqlalchemy.add_stateful_versioned_m2m_on_version(PackageRevision, 'tags')
 ## ------------------------
 ## Repository helper object
 
-from tools import Repository
+from .tools import Repository
 repo = Repository(metadata, Session,
         versioned_objects = [ Package, License,  PackageTag ]
         )
-
