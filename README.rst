@@ -27,5 +27,5 @@ vdm/sqlalchemy/demo.py).
 
 Run the tests using nosetests::
 
-    $ nosestests vdm/sqlalchemy
+    $ nosetests vdm/sqlalchemy
 
