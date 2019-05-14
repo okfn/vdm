@@ -23,7 +23,7 @@ if sqav[:3] in ("0.4", "0.5"):
                self.execute()
      postgres.dialect.schemadropper = CascadeSchemaDropper
 
-elif sqav[:3] in ("0.6", "0.7", "0.8", "0.9", "1.0", "1.1"):
+elif sqav[:3] in ("0.6", "0.7", "0.8", "0.9", "1.0", "1.1", "1.2", "1.3"):
      from sqlalchemy.dialects.postgresql import base
      def visit_drop_table(self, drop):
           return "\nDROP TABLE " + \
